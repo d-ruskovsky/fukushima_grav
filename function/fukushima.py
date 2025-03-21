@@ -1,5 +1,6 @@
 import numpy as np
 from tripledif import *
+import math             # na binomický koeficient math.comb()
 
 # Funkcia Fukushima (WIP), cieľom je výpočet gravitačného potenciálu
 # zrýchlenia, a tenzoru na základe článku Fukushima 2018. 
@@ -10,8 +11,6 @@ from tripledif import *
 # výpočet aj tak musí začať homogénnou prizmou, až potom riešiť výpočet cez 
 # cyklus pre rho = 2+. 
 #
-# Vytvoriť funkciu pre riešenie triple difference (ten trojuholnik 3) ? 
-#
 # Vo vzorci (13) vstupuje súradnica z výpočtového bodu, vo vzorci (14) je táto
 # súradnica umocnená na index j ktorý = n - m
 #
@@ -19,46 +18,46 @@ from tripledif import *
 # polynómu rho, ??? m nadobúda hodnoty 0-N a tiež n ??? 
 #
 # Bolo by dobré túto funkciu prepísať do jazyka c, ale to až bude funkčná
-#
-# ??????!!!!!!!!! Netreba ako vstup použiť skôr krajné "súradnice" prizmy x1,x2,ako dx ??? do výpočtu vstupujú viac a nikde nie je žiadny rozmer prizmy
 
-def Fukushima(x1,y1,z1,dx, dy, dz, poloha_bod, poloha_element,rho):
+def Fukushima(coor_prism,coor_point,rho):
 
     # INPUTs: 
-    #           "poloha_bod"        - 3D karteziánske súradnice výpočtového bodu
-    #                               (vektor s 3 hodnotami)
-    #           "poloha_element"    - poloha elementu (?) v doméne prizmy, v článku označené ako x',y',z'
-    #           "rho"               - vektor parametrov polynómu vyjadrujúceho 
-    #                               hustotu (zmenu) v radiálnom smere prizmy
-    #           "dx,dy,dz"          - rozmery prizmy v 3D kart. súr. sys. 
-    #           "x1,x2,x3"          - súradnice okrajov prizmy ? asi zle, opýtať sa !!!!
+    #           "coor_prism"        - 3D karteziánske súradnice okrajov pravouhlej prizmy vo tvare "x1,x2,y1,y2,z1,z2" (vektor s 6 hodnotami)
+    #           "coor_point"        - 3D karteziánske súradnice výpočtového bodu (vektor s 3 hodnotami)
+    #           "rho"               - vektor parametrov polynómu vyjadrujúceho hustotu (zmenu) v radiálnom smere prizmy (rôzne dlhý vektor)
 
     # OUTPUTs:
     #                               Zatiaľ nič - do budúcnosti gravitačný potenciál, zrýchlenie a tenzor
+
     G = 6.67430 * 10**-11           # Newtonova gravitačná konštanta (zdr. Bucha, Fyzikálna Geodézia )     
 
-    # ================================== F U N K C I A ==================================================
+    # ================================== F U N K C I A ================================================== #
+
+    X1, Y1, Z1 = coor_prism[0] - coor_point[0], coor_prism[2] - coor_point[1], coor_prism[4] - coor_point[2]                # (10) posunutie "shifted endpoints"
+    X2, Y2, Z2 = coor_prism[1] - coor_point[0], coor_prism[3] - coor_point[1], coor_prism[5] - coor_point[2] 
     
-    x2, y2, z2 = x1 + dx, y1 + dy, z1 + dz                                                                                  # pripočítanie súradníc rohov prizmy podľa jej zadanej veľkosti (?)
+    # ---------- Homogénna prizma ------------- # 
 
-    X, Y, Z = poloha_element[0] - poloha_bod[0], poloha_element[1] - poloha_bod[1], poloha_element[2] - poloha_bod[2]       # (6) zmena integračných premenných (asi netreba)
+    # Potenciál - V ------
+    U_0 = lambda X, Y, Z, func_val: \
+        -((X**2 * func_val[0]) + (Y**2 * func_val[1]) + (Z**2 * func_val[2]) / 2) + \
+              (Y * Z * func_val[3]) + (Z * X * func_val[4]) + (X * Y * func_val[5])                                         # (23) ako anonýmna funkcia lambda
 
-    X1, Y1, Z1 = x1 - poloha_bod[0], y1 - poloha_bod[1], z1 - poloha_bod[2]                                                 # (10) posunutie "shifted endpoints"
-    X2, Y2, Z2 = x2 - poloha_bod[0], y2 - poloha_bod[1], z2 - poloha_bod[2] 
+    W_0 = triple_dif(U_0,X1,Y1,Z1,X2,Y2,Z2,homogenous=True)                                                                 # (9)
 
-    U_0 = "-((X**2 * A) + (Y**2 * B) + (Z**2 * C) / 2) + (Y * Z * D) + (Z * X * E) + (X * Y * F)"                           # (23) v stringu pre funkciu triple_dif
+    c_0j = 1 * G * rho[0]                                                                                                   # (15) pri n=0,  binom. koef = 1 
 
-    W_0 = triple_dif(U_0,X1,Y1,Z1,X2,Y2,Z2)                                                                                 # (9)
+    c_0 = c_0j * (coor_point[2]**1)                                                                                         # (14)
 
-    c_0j = 1 * G * rho[0]                                                                                                   # (15) tieto neviem či sú správne stále nechápem indexom m,n,j
-                                                                                                                            # ale tipujem že bin. koef. je pri konštantnom polynome rho 1 
+    # Počiatočná hodnota potenciálu ----
+    V = c_0 * W_0                                                                                                           # (13)
 
-    c_0 = c_0j * (poloha_bod[2]**1)                                                                                         # (14)
+    # Zrýchlenie - g ------ 
 
 
-    c = c_0
-    W = W_0
-    V = c * W                                                                                                               # (13)
+    # ---------- Nehomogénna prizma ------------- # 
+
+    # :) 
 
     return V
 

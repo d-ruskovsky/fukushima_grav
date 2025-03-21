@@ -1,58 +1,84 @@
 import numpy as np
 
 # Knižnica tripledif 
-# Aktuálne obsahuje 2 funkcie - 
-#                               evaluate_equation_0         - vyčíslenie rovnice (homogénna prizma - U_0)
-#                               triple_dif                  - samotný operátor trojitej diferencie (Fukushima (11))
+
+# Aktuálne obsahuje 3 funkcie - 
+#                               elemfun_0              - elementárne funkcie (homogénna prizma)
+#                               elemfun_n              - elementárne funkcie (nehomogénna prizma)
+#                               triple_dif             - operátor trojitej diferencie (Fukushima (11))
 
 # TO DO: 
-#   - doriešiť súradnice, kde sa hýbeme a jak, nerozumiem vzorcom (1),(6) a (10)
-#   - vytvoriť funkcie na trojitú diferenciu aj pre nenulové funkcie U, "evaluate_equation_0" aktuálne používa parametre A,B..R použiteľné len pre homogénnu prizmu 
+#            urobiť funkciu pre elemfun_n 
 
+def elemfun_0(X,Y,Z):
 
-def evaluate_equation_0(rovnica,X,Y,Z):
+    # funkcia pre výpočet elementárnych funkcií A,B,C,D,E,F (24) v prípade homogénnej prizmy 
 
-    # funkcia pre evaluáciu zvolenej rovnice, aktuálne len pre rovnice homogénnej prizmy (vzorce Fukushima (23) až (25))
+    # INPUT -   "X,Y,Z"                 - trojrozmerné súradnice bodu posunuté podľa (10) 
 
-    # INPUT -   "rovnica"               - rovnica obsahujúca súradnice X,Y,Z (prípadne aj parametre elementárnych funkcií A,B,C,D,E,F a R) vo formáte string !! 
-    #           "X,Y,Z"                 - trojrozmerné súradnice výpočtového bodu posunuté podľa (10) ??? nechápem, doriešiť 
-
-    # OUTPUT -  "f"                     - vyčíslená hodnota zvolenej rovnice podľa zadaných súradníc 
+    # OUTPUT -  "A,B,C,D,E,F"           - elementárne funkcie podľa (24) v prípade homogénnej prizmy  
 
     R = np.sqrt(X**2 + Y**2 + Z**2)                         # (25) -    euklidovská vzdialenosť
 
     D = np.log(X + R)                                       # (24) -    elementárne funkcie
     E = np.log(Y + R)
     F = np.log(Z + R)
+    
+    A = np.arctan((Y*Z) / (X*R))
+    B = np.arctan((Z*X) / (Y*R))
+    C = np.arctan((X*Y) / (Z*R))
 
-    A = np.atan(Y*Z , X*R)
-    B = np.atan(Z*X , Y*R)
-    C = np.atan(X*Y , Z*R)
-
-    f = eval(rovnica)
-
-    return f
+    return A,B,C,D,E,F
 
 
+def elemfun_n(X,Y,Z):
 
-def triple_dif(rovnica,X1,Y1,Z1,X2,Y2,Z2):
+    return 0
 
-    # funkcia trojitej diferencie aplikuje operátor podľa vzťahu Fukushima (11) na danú funkciu v stringu, zatiaľ platná len pre U_0 (homogénna prizma)!!!
 
-    # INPUT -   "rovnica"               - rovnica obsahujúca súradnice X,Y,Z (prípadne aj parametre elementárnych funkcií A,B,C,D,E,F a R) vo formáte string !!
-    #           "X1,Y1...Z2"            - trojrozmerné súradnice podľa článku, DORIEŠIŤ
-    #           "evaluate_equation_0"   - funkcia vyčíslujúca vstupnú rovnicu so zadanými súradnicami a jej parametrami podľa Fukushima (24) a (25), čiže pre homogénnu prizmu U_0
+
+def triple_dif(equation,X1,Y1,Z1,X2,Y2,Z2,homogenous=True):
+
+    # funkcia trojitej diferencie aplikuje operátor podľa vzťahu Fukushima (11) 
+
+    # INPUT -   "equation"              - rovnica obsahujúca súradnice X,Y,Z zadefinovaná anonýmnou funkciou lambda, viď. DEFINE
+    #           "X1,Y1...Z2"            - upravené súradnice, shifted endpoints (10)
+    #           "homogenous"            - boolean, True - použijú sa elementárne funkcie pre homogénnnu prizmu, False - nehomogénna prizma
 
     # OUTPUT -  "vysl"                  - vyčíslená hodnota zvolenej rovnice s použitím operátora trojitej diferencie 
 
-    f1 = evaluate_equation_0(rovnica,X2, Y2, Z2)
-    f2 = evaluate_equation_0(rovnica,X2, Y2, Z1)
-    f3 = evaluate_equation_0(rovnica,X2, Y1, Z2)
-    f4 = evaluate_equation_0(rovnica,X2, Y1, Z1)
-    f5 = evaluate_equation_0(rovnica,X1, Y2, Z2)
-    f6 = evaluate_equation_0(rovnica,X1, Y2, Z1)
-    f7 = evaluate_equation_0(rovnica,X1, Y1, Z2)
-    f8 = evaluate_equation_0(rovnica,X1, Y1, Z1)
+    # DEFINE -  "equation"              - rovnica musí byť definovaná cez lambda (anonýmnu funkciu), kde parametrami funkcie sú súradnice XYZ a 
+    #                                      tuple hodnoty vypočítaných element. funkcií pre danú prizmu v poradí v akom ich funkcia elemfun vracia 
+
+    if homogenous:                      # Predefinovanie názvu funkcie, použitie element. funkc. pre homogénnu či nehomogénnu prizmu 
+        elemfun = elemfun_0
+    else:
+        elemfun = elemfun_n
+
+    f1_element_val = elemfun(X2,Y2,Z2)          # výpočet elementárnych funkcií pre funkciu
+    f1 = equation(X2, Y2, Z2,f1_element_val)    # výpočet funkcie na základe daných súradníc 
+
+    f2_element_val = elemfun(X2,Y2,Z1)
+    f2 = equation(X2, Y2, Z1,f2_element_val)
+
+    f3_element_val = elemfun(X2,Y1,Z2)
+    f3 = equation(X2, Y1, Z2,f3_element_val)
+
+    f4_element_val = elemfun(X2,Y1,Z1)
+    f4 = equation(X2, Y1, Z1,f4_element_val)
+
+    f5_element_val = elemfun(X1,Y2,Z2)
+    f5 = equation(X1, Y2, Z2,f5_element_val)
+
+    f6_element_val = elemfun(X1,Y2,Z1)
+    f6 = equation(X1, Y2, Z1,f6_element_val)
+
+    f7_element_val = elemfun(X1,Y1,Z2)
+    f7 = equation(X1, Y1, Z2,f7_element_val)
+
+    f8_element_val = elemfun(X1,Y1,Z1)
+    f8 = equation(X1, Y1, Z1,f8_element_val)
+
 
     vysl = f1 - f2 - f3 + f4 - f5 + f6 + f7 - f8            # (11) -    trojitá diferencia funkcie
 
