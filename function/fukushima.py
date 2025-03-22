@@ -45,6 +45,7 @@ def Fukushima(coor_prism,coor_point,rho):
 
     W_0 = triple_dif(U_0,X1,Y1,Z1,X2,Y2,Z2,homogenous=True)                                                                 # (9)
 
+    # Indexy !! prekontrolovať tieto vzorce až budú indexy vyriešené
     c_0j = 1 * G * rho[0]                                                                                                   # (15) pri n=0,  binom. koef = 1 
 
     c_0 = c_0j * (coor_point[2]**1)                                                                                         # (14)
@@ -54,12 +55,41 @@ def Fukushima(coor_prism,coor_point,rho):
 
     # Zrýchlenie - g ------ 
 
+    U_0x = lambda X, Y, Z, func_val: \
+            -(X * func_val[0]) + (Y * func_val[5]) + (Z * func_val[4])                                                      # (23)
+
+    U_0y = lambda X, Y, Z, func_val: \
+            (X * func_val[5]) - (Y * func_val[1]) + (Z * func_val[3])
+    
+    U_0z = lambda X, Y, Z, func_val: \
+            (X * func_val[4]) + (Y * func_val[3]) - (Z * func_val[2])
+    
+    dW_0x = -(triple_dif(U_0x,X1,Y1,Z1,X2,Y2,Z2,homogenous=True))                                                           # (20)
+    dW_0y = -(triple_dif(U_0y,X1,Y1,Z1,X2,Y2,Z2,homogenous=True))
+    dW_0z = -(triple_dif(U_0z,X1,Y1,Z1,X2,Y2,Z2,homogenous=True))
+
+    # Tu je to pravdepodobne chybné pretože stále nerozumiem indexom, prerobiť až sa v nich vyznáš 
+    # zatiaľ uvažujem že n = 1, m = 0 - ale úprimne neviem úplne prečo, just a hunch, aj pri potenciáli to mám inak :) 
+    d_c0_nm = 1 * math.comb(1 + 0 + 1,1) * G * rho[0]                                                                       # (19)
+
+    # Opäť som odignoroval sumáciu kvôli indexom, zároveň indexy :) 
+    d_c_0 = d_c0_nm * coor_point[2]**1
+
+    # Počiatočná hodnota zrýchlenia ----
+
+    g_x = c_0 * dW_0x
+    g_y = c_0 * dW_0y
+    g_z = (c_0 * dW_0z) + (d_c_0 * W_0)
 
     # ---------- Nehomogénna prizma ------------- # 
 
     # :) 
 
-    return V
+    # -- Posledné úpravy --
+
+    g = [g_x,g_y,g_z]
+
+    return V, g
 
 
 
