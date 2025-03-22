@@ -18,6 +18,8 @@ def elemfun_0(X,Y,Z):
 
     # OUTPUT -  "A,B,C,D,E,F"           - elementárne funkcie podľa (24) v prípade homogénnej prizmy  
 
+    # ============================ F U N K C I A =================================== #
+
     R = np.sqrt(X**2 + Y**2 + Z**2)                         # (25) -    euklidovská vzdialenosť
 
     D = np.log(X + R)                                       # (24) -    elementárne funkcie
@@ -31,7 +33,9 @@ def elemfun_0(X,Y,Z):
     return A,B,C,D,E,F
 
 
-def elemfun_n(X,Y,Z):
+def elemfun_n(X,Y,Z):   
+
+    # funkcia pre výpočet elementárnych funkcií v prípade nehomogénnej prizmy
 
     return 0
 
@@ -50,13 +54,15 @@ def triple_dif(equation,X1,Y1,Z1,X2,Y2,Z2,homogenous=True):
     # DEFINE -  "equation"              - rovnica musí byť definovaná cez lambda (anonýmnu funkciu), kde parametrami funkcie sú súradnice XYZ a 
     #                                      tuple hodnoty vypočítaných element. funkcií pre danú prizmu v poradí v akom ich funkcia elemfun vracia 
 
+    # ============================ F U N K C I A =================================== #
+
     if homogenous:                      # Predefinovanie názvu funkcie, použitie element. funkc. pre homogénnu či nehomogénnu prizmu 
         elemfun = elemfun_0
     else:
         elemfun = elemfun_n
 
-    f1_element_val = elemfun(X2,Y2,Z2)          # výpočet elementárnych funkcií pre funkciu
-    f1 = equation(X2, Y2, Z2,f1_element_val)    # výpočet funkcie na základe daných súradníc 
+    f1_element_val = elemfun(X2,Y2,Z2)          # výpočet elementárnych funkcií pre rovnicu
+    f1 = equation(X2, Y2, Z2,f1_element_val)    # výpočet rovnice na základe daných súradníc 
 
     f2_element_val = elemfun(X2,Y2,Z1)
     f2 = equation(X2, Y2, Z1,f2_element_val)
@@ -80,6 +86,6 @@ def triple_dif(equation,X1,Y1,Z1,X2,Y2,Z2,homogenous=True):
     f8 = equation(X1, Y1, Z1,f8_element_val)
 
 
-    vysl = f1 - f2 - f3 + f4 - f5 + f6 + f7 - f8            # (11) -    trojitá diferencia funkcie
+    vysl = f1 - f2 - f3 + f4 - f5 + f6 + f7 - f8            # (11) -    trojitá diferencia funkcie (operátor)
 
     return vysl
