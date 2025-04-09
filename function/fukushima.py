@@ -80,7 +80,7 @@ def Fukushima(coor_prism,coor_point,rho):
 
     g_x = c_0 * W_0X
     g_y = c_0 * W_0Y
-    g_z = (c_0 * W_0Z) # + (d_c_0 * W_0)  - zakomentované, Bucha to vo výpočte odstránil - opýtať sa prečo (asi kvôli sum^-1)
+    g_z = (c_0 * W_0Z) # + (d_c_0 * W_0)  # zakomentované, Bucha to vo výpočte odstránil - opýtať sa prečo (asi kvôli sum^-1)
 
     g = np.array([g_x,g_y,g_z])   # vloženie do vektora (tuple)
 
@@ -118,7 +118,7 @@ def Fukushima(coor_prism,coor_point,rho):
     G_0XZ = (c_0 * W_0XZ) # + (d_c_0 * W_0X)
     G_0YY = c_0 * W_0YY
     G_0YZ = (c_0 * W_0YZ) # + (d_c_0 * W_0Y)
-    G_0ZZ = (c_0 * W_0ZZ) # + (2 * d_c_0 * W_0Z) + (dd_c_0 * W_0) ten istý dôvod zakomentovania
+    G_0ZZ = (c_0 * W_0ZZ) # + (2 * d_c_0 * W_0Z) + (dd_c_0 * W_0) # ten istý dôvod zakomentovania
 
     G     = np.array([[G_0XX, G_0XY, G_0XZ],    # vloženie do matice
                       [0    , G_0YY, G_0YZ],

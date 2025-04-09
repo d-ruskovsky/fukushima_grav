@@ -11,6 +11,25 @@ import numpy as np
 #            skontrolovať správnosť (obzvlášť pri elemfun_n  - rekurentný výpočet)
 #            upraviť triple_dif aby obsahoval argument stupňa polynómu N bez potreby *args
 
+def atan3(X,Y,Z):
+    # Funkcia na výpočet špeciálnej funkcie atan3 podľa (37) kapitoly 2.6 (Fukushima)
+
+    if X == 0:
+        return 0
+    else:
+       return np.arctan((Y * Z) / (X * np.sqrt(X**2 + Y**2 + Z**2 )))  
+    
+def logsum(X,Y,Z):
+    # Funkcia na výpočet špeciálnej funkcie logsum podľa (38) kapitoly 2.6 (Fukushima)
+
+    omega = 1e-150                                          # (39) -    konštanta omega
+    if X > 0:
+        return np.log(X + np.sqrt(X**2 + Y**2 + Z**2))
+    elif X == 0:
+        return (1/2) * np.log(Y**2 + Z**2 + omega)
+    else:
+        return np.log((Y**2 + Z**2 + omega) / np.sqrt(X**2 + Y**2 + Z**2 - X))
+
 def elemfun_0(X,Y,Z):
 
     # funkcia pre výpočet elementárnych funkcií A,B,C,D,E,F (24) v prípade homogénnej prizmy 
@@ -22,15 +41,24 @@ def elemfun_0(X,Y,Z):
 
     # ============================ F U N K C I A =================================== #
 
-    R = np.sqrt(X**2 + Y**2 + Z**2)                         # (25) -    euklidovská vzdialenosť
+    omega = 1e-150                                          # (39) -    konštanta omega
 
-    D = np.log(X + R)                                       # (24) -    elementárne funkcie
-    E = np.log(Y + R)
-    F = np.log(Z + R)
+    A = atan3(X,Y,Z)
+    B = atan3(Y,Z,X)
+    C = atan3(Z,X,Y)
     
-    A = np.arctan((Y*Z) / (X*R))
-    B = np.arctan((Z*X) / (Y*R))
-    C = np.arctan((X*Y) / (Z*R))
+    D = logsum(X,Y,Z)
+    E = logsum(Y,Z,X)
+    F = logsum(Z,X,Y)
+    R = np.sqrt(X**2 + Y**2 + Z**2 + omega)                  # (25) -    euklidovská vzdialenosť
+
+    # D = np.log(X + R)                                       # (24) -    elementárne funkcie
+    # E = np.log(Y + R)
+    # F = np.log(Z + R)
+    # 
+    # A = np.arctan((Y*Z) / (X*R))
+    # B = np.arctan((Z*X) / (Y*R))
+    # C = np.arctan((X*Y) / (Z*R))
 
     return A, B, C, D, E, F, R
     #      0, 1, 2, 3, 4, 5, 6
