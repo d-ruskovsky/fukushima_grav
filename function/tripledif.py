@@ -1,6 +1,8 @@
 import numpy as np
 
-# Knižnica tripledif 
+# Doplňujúca knižnica tripledif ku knižnici fukushima
+
+# zoznam článkov (zdroje vzťahov) je uvedený v knižnici fukushima
 
 # Aktuálne obsahuje 3 funkcie - 
 #                               elemfun_0              - elementárne funkcie (n = 0)
@@ -63,26 +65,19 @@ def elemfun_0(X,Y,Z):
     return A, B, C, D, E, F, R
     #      0, 1, 2, 3, 4, 5, 6
 
-def elemfun_n(X,Y,Z,nmax):   
+def elemfun_n(X,Y,Z,N):   
 
     # funkcia pre výpočet elementárnych funkcií v prípade nehomogénnej prizmy teda n = 1,2.. 
 
     # INPUT -   "X,Y,Z"                 - trojrozmerné súradnice bodu posunuté podľa (10)
-    #           "nmax"                  - maximálna hodnota rekurentného výpočtu (stupeň polynómu)
+    #           "N"                     - maximálna hodnota rekurentného výpočtu (stupeň polynómu)
 
     # OUTPUT -  "R_n, E_n, D_n"         - elementárne funkcie vypočítané pre daný stupeň polynómu
     #           "E_n2, D_n2"            - elementárne funkcie vypočítané pre stupeň polynómu + 2 pre potrebu výpočtu U 
     #           "C"                     - elementárna funkcia podľa (24) ktorá je taktiež potrebná pre výpočet U ak n=1,2.. 
 
     # ============================ F U N K C I A =================================== #
-
-    R = elemfun_0(X,Y,Z)[6]         # uloženie premenných z funkcie elemfun_0 pre výpočet v tejto funkcii 
-    F = elemfun_0(X,Y,Z)[5]
-    E = elemfun_0(X,Y,Z)[4]
-    D = elemfun_0(X,Y,Z)[3]
-    C = elemfun_0(X,Y,Z)[2]
-    B = elemfun_0(X,Y,Z)[1]
-    A = elemfun_0(X,Y,Z)[0]
+    A, B, C, D, E, F, R = elemfun_0(X, Y, Z)            # uloženie premenných z funkcie elemfun_0 pre výpočet v tejto funkcii 
 
     S = X**2 + Y**2                                                                 # (31)
 
@@ -96,7 +91,7 @@ def elemfun_n(X,Y,Z,nmax):
     E_2 = (X * A) - (Y * F)
 
     # Rekurentný výpočet R,D,E =====================================================
-    if nmax == 1:       # v prípade že N = 1 ---------------------------------------
+    if N == 1:       # v prípade že N = 1 ---------------------------------------
         
         D_n2 = -(Y**2 * D_1) - (X * R_1)                                             # (27)
         E_n2 = -(X**2 * E_1) - (Y * R_1)
@@ -106,7 +101,7 @@ def elemfun_n(X,Y,Z,nmax):
         E_n = E_1
 
 
-    elif nmax == 2:     # v prípade že N = 2 ---------------------------------------
+    elif N == 2:     # v prípade že N = 2 ---------------------------------------
 
         D_n2 = -(Y**2 * D_2) - (X * R_2)                                             # (27)
         E_n2 = -(X**2 * E_2) - (Y * R_2)
@@ -116,13 +111,13 @@ def elemfun_n(X,Y,Z,nmax):
         E_n = E_2
 
     else:               # v prípade že N > 2 ---------------------------------------
-        for n in range(3,nmax + 3):     # range od 3 (0,1,2 máme) po nmax + 3 (+1 pretože python neberie poslednú hodnotu, + 2 pretože potrebuje n+2 na výpočet U)
+        for n in range(3,N + 3):     # range od 3 (0,1,2 máme) po nmax + 3 (+1 pretože python neberie poslednú hodnotu, + 2 pretože potrebuje n+2 na výpočet U)
             
             R_n = ((Z**(n-1) * R) - ((n - 1) * S * R_1)) / n                        # (29) 
             D_n = -(Y**2 * D_1) - (X * R_1)                                         # (27)
             E_n = -(X**2 * E_1) - (Y * R_1)
 
-            if n == (nmax+1):
+            if n == (N+1):
                 R_main = R_n
                 D_main = D_n
                 E_main = E_n
@@ -150,14 +145,14 @@ def elemfun_n(X,Y,Z,nmax):
 
 
 
-def triple_dif(equation,X1,Y1,Z1,X2,Y2,Z2,*args,homogenous=True):
+def triple_dif(equation,X1,Y1,Z1,X2,Y2,Z2,*args,N):
 
     # funkcia trojitej diferencie aplikuje operátor podľa vzťahu Fukushima (11) 
 
     # INPUT -   "equation"              - rovnica obsahujúca súradnice X,Y,Z zadefinovaná anonýmnou funkciou lambda, viď. DEFINE
     #           "X1,Y1...Z2"            - upravené súradnice, shifted endpoints (10)
-    #           "*args"                 - dodatočné argumenty, pridať N (nmax) stupeň polynómu rho pri použití elemfun_n
-    #           "homogenous"            - boolean, True - použijú sa elementárne funkcie pre homogénnnu prizmu, False - nehomogénna prizma
+    #           "*args"                 - dodatočné argumenty
+    #           "N"                     - stupeň polynómu modelujúceho hustotu, hodnota 0 uvažuje s homogénnou prizmou
 
     # OUTPUT -  "triple_difference"     - vyčíslená hodnota zvolenej rovnice s použitím operátora trojitej diferencie 
 
@@ -166,12 +161,12 @@ def triple_dif(equation,X1,Y1,Z1,X2,Y2,Z2,*args,homogenous=True):
 
     # ============================ F U N K C I A =================================== #
 
-    if homogenous:                      # Predefinovanie názvu funkcie, použitie element. funkc. pre homogénnu či nehomogénnu prizmu 
+    if N == 0:                      # Predefinovanie názvu funkcie, použitie element. funkc. pre homogénnu či nehomogénnu prizmu 
         elemfun = elemfun_0
     else:
         elemfun = elemfun_n
 
-    f1_element_val = elemfun(X2,Y2,Z2,*args)          # výpočet elementárnych funkcií pre rovnicu
+    f1_element_val = elemfun(X2,Y2,Z2,*args)    # výpočet elementárnych funkcií pre rovnicu
     f1 = equation(X2, Y2, Z2,f1_element_val)    # výpočet rovnice na základe daných súradníc 
 
     f2_element_val = elemfun(X2,Y2,Z1,*args)
