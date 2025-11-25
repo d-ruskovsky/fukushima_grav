@@ -30,7 +30,7 @@ def logsum(X,Y,Z):
     elif X == 0:
         return (1/2) * np.log(Y**2 + Z**2 + omega)
     else:
-        return np.log((Y**2 + Z**2 + omega) / np.sqrt(X**2 + Y**2 + Z**2 - X))
+        return np.log((Y**2 + Z**2 + omega) / (np.sqrt(X**2 + Y**2 + Z**2) - X))
 
 def elemfun_0(X,Y,Z,N):
 
