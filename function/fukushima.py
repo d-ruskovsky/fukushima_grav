@@ -39,7 +39,24 @@ def Fukushima(coor_prism,coor_point,rho_s,rho_gradient,N):
     # OUTPUTs:
     #           "V"                 - gravitačný potenciál generovaný prizmou vo výpočtovom bode
     #           "g"                 - vektor gravitačného zrýchlenia generujúceho prizmou vo výpočtovom bode
-    #           "G"                 - tenzor gravitačného zrýchlenia generujúceho prizmou vo výpočtovom bode  
+    #           "G"                 - tenzor gravitačného zrýchlenia generujúceho prizmou vo výpočtovom bode
+
+    # Elementárne funkcie U sú transformované na W pomocou funkcie triple_dif, ktorá si volá funkcie elemfun_0 a 
+    # elemfun_n. Keďže tieto funkcie vyžadujú rôzne kombinácie parametrov a súradníc je na ich fungovanie potrebné 
+    # zadefinovať elementárne funkcie U pomocou anonýmnej funkcie lambda. Táto vyžaduje ako vstup súradnice, a 
+    # func_val, čo sú parametre (elementary functions) vypočítané funkciami elemfun_0 a elemfun_n. Záležiac od stupňa
+    # polynómu, je však rozdiel ktoré z týchto parametrov sú potrebné pre výpočet U. Tieto funkcie preto vracajú 
+    # tieto parametre, len podľa stupňa, je preto rozdiel medzi func_val[1] pri N=0 a func_val[1] pri N=1.
+    # V prvom prípade je parameter s ktorým bude triple_dif počítať B, v druhom to je E_n. Nižšie sú preto 
+    # tieto parametre zoradené, pre lepšie pochopenie zostavenia vzťahov U v samotnom výpočte. 
+
+    #  elemfun_0
+    #  A, B, C, D, E, F, R
+    #  0, 1, 2, 3, 4, 5, 6
+
+    #  elemfun_n
+    #  R_n, E_n, D_n, E_n2, D_n2, C 
+    #  0    1    2    3     4     5
 
     # ================================== F U N K C I A ================================================== #
 
