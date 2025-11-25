@@ -32,7 +32,7 @@ def logsum(X,Y,Z):
     else:
         return np.log((Y**2 + Z**2 + omega) / np.sqrt(X**2 + Y**2 + Z**2 - X))
 
-def elemfun_0(X,Y,Z):
+def elemfun_0(X,Y,Z,N):
 
     # funkcia pre výpočet elementárnych funkcií A,B,C,D,E,F (24) v prípade homogénnej prizmy 
 
@@ -77,7 +77,7 @@ def elemfun_n(X,Y,Z,N):
     #           "C"                     - elementárna funkcia podľa (24) ktorá je taktiež potrebná pre výpočet U ak n=1,2.. 
 
     # ============================ F U N K C I A =================================== #
-    A, B, C, D, E, F, R = elemfun_0(X, Y, Z)            # uloženie premenných z funkcie elemfun_0 pre výpočet v tejto funkcii 
+    A, B, C, D, E, F, R = elemfun_0(X, Y, Z,N)            # uloženie premenných z funkcie elemfun_0 pre výpočet v tejto funkcii 
 
     S = X**2 + Y**2                                                                 # (31)
 
@@ -166,28 +166,28 @@ def triple_dif(equation,X1,Y1,Z1,X2,Y2,Z2,N,*args):
     else:
         elemfun = elemfun_n
 
-    f1_element_val = elemfun(X2,Y2,Z2,*args)    # výpočet elementárnych funkcií pre rovnicu
+    f1_element_val = elemfun(X2,Y2,Z2,N,*args)    # výpočet elementárnych funkcií pre rovnicu
     f1 = equation(X2, Y2, Z2,f1_element_val)    # výpočet rovnice na základe daných súradníc 
 
-    f2_element_val = elemfun(X2,Y2,Z1,*args)
+    f2_element_val = elemfun(X2,Y2,Z1,N,*args)
     f2 = equation(X2, Y2, Z1,f2_element_val)
 
-    f3_element_val = elemfun(X2,Y1,Z2,*args)
+    f3_element_val = elemfun(X2,Y1,Z2,N,*args)
     f3 = equation(X2, Y1, Z2,f3_element_val)
 
-    f4_element_val = elemfun(X2,Y1,Z1,*args)
+    f4_element_val = elemfun(X2,Y1,Z1,N,*args)
     f4 = equation(X2, Y1, Z1,f4_element_val)
 
-    f5_element_val = elemfun(X1,Y2,Z2,*args)
+    f5_element_val = elemfun(X1,Y2,Z2,N,*args)
     f5 = equation(X1, Y2, Z2,f5_element_val)
 
-    f6_element_val = elemfun(X1,Y2,Z1,*args)
+    f6_element_val = elemfun(X1,Y2,Z1,N,*args)
     f6 = equation(X1, Y2, Z1,f6_element_val)
 
-    f7_element_val = elemfun(X1,Y1,Z2,*args)
+    f7_element_val = elemfun(X1,Y1,Z2,N,*args)
     f7 = equation(X1, Y1, Z2,f7_element_val)
 
-    f8_element_val = elemfun(X1,Y1,Z1,*args)
+    f8_element_val = elemfun(X1,Y1,Z1,N,*args)
     f8 = equation(X1, Y1, Z1,f8_element_val)
 
 

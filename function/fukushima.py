@@ -65,110 +65,119 @@ def Fukushima(coor_prism,coor_point,rho_s,rho_gradient,N):
 
     # ---------- Homogénna prizma ------------- # 
 
-    # Váhové funkcie
+    # Váhové funkcie  - počiatočné hodnoty
 
     # Potenciál - V ------
-    U_0 = lambda X, Y, Z, func_val_0: \
+    U = lambda X, Y, Z, func_val_0: \
        -((X**2 * func_val_0[0]) + (Y**2 * func_val_0[1]) + (Z**2 * func_val_0[2])) / 2 + \
              (Y * Z * func_val_0[3]) + (Z * X * func_val_0[4]) + (X * Y * func_val_0[5])                     # (23) ako anonýmna funkcia lambda
 
     # Zrýchlenie - g ------ 
-    U_0x = lambda X, Y, Z, func_val_0: \
+    Ux = lambda X, Y, Z, func_val_0: \
             -(X * func_val_0[0]) + (Y * func_val_0[5]) + (Z * func_val_0[4])                                 # (23)
 
-    U_0y = lambda X, Y, Z, func_val_0: \
+    Uy = lambda X, Y, Z, func_val_0: \
             (X * func_val_0[5]) - (Y * func_val_0[1]) + (Z * func_val_0[3])
     
-    U_0z = lambda X, Y, Z, func_val_0: \
+    Uz = lambda X, Y, Z, func_val_0: \
             (X * func_val_0[4]) + (Y * func_val_0[3]) - (Z * func_val_0[2])
     
     # Tenzor - T ------
-    U_0XX = lambda X, Y, Z, func_val_0: \
+    Uxx = lambda X, Y, Z, func_val_0: \
                 -func_val_0[0]
     
-    U_0XY = lambda X, Y, Z, func_val_0: \
+    Uxy = lambda X, Y, Z, func_val_0: \
                 func_val_0[5]
     
-    U_0XZ = lambda X, Y, Z, func_val_0: \
+    Uxz = lambda X, Y, Z, func_val_0: \
                 func_val_0[4]
     
-    U_0YY = lambda X, Y, Z, func_val_0: \
+    Uyy = lambda X, Y, Z, func_val_0: \
                 -func_val_0[1]
     
-    U_0YZ = lambda X, Y, Z, func_val_0: \
+    Uyz = lambda X, Y, Z, func_val_0: \
                 func_val_0[3]
     
-    U_0ZZ = lambda X, Y, Z, func_val_0: \
+    Uzz = lambda X, Y, Z, func_val_0: \
                 -func_val_0[2]
     
-    # Aplikácia operátora trojitej diferencie
+    # Inicializácia gravitačného účinku do cyklu
+    V,g_x,g_y,g_z,G_XX,G_XY,G_YY,G_XZ,G_YZ,G_ZZ  = (0,) * 10
 
-    W_0 = triple_dif(U_0,X1,Y1,Z1,X2,Y2,Z2,0)                                                                # (9)                                                                                                    # (13)
+    for q in range(0,N+1):
+        # Kontrola homogenity - ak je q 0 tak je prizma homogénna - použijú sa vzťahy pre homogénnu prizmu
+        if q > 0:
+            U = lambda X, Y, Z, func_val: \
+            -((Z**(q+2) * func_val[5]) / (q+2)) + ((Z**(q+1)*(Y*func_val[2] + X*func_val[1])) / (q+1)) \
+            -((Y*func_val[4] + X*func_val[3]) / ((q+1)*(q+2)))
 
-    W_0X = -(triple_dif(U_0x,X1,Y1,Z1,X2,Y2,Z2,0))                                                           # (20)
-    W_0Y = -(triple_dif(U_0y,X1,Y1,Z1,X2,Y2,Z2,0))
-    W_0Z = -(triple_dif(U_0z,X1,Y1,Z1,X2,Y2,Z2,0))  
-    
-    W_0XX = triple_dif(U_0XX,X1,Y1,Z1,X2,Y2,Z2,0)
-    W_0XY = triple_dif(U_0XY,X1,Y1,Z1,X2,Y2,Z2,0)
-    W_0XZ = triple_dif(U_0XZ,X1,Y1,Z1,X2,Y2,Z2,0)
-    W_0YY = triple_dif(U_0YY,X1,Y1,Z1,X2,Y2,Z2,0)
-    W_0YZ = triple_dif(U_0YZ,X1,Y1,Z1,X2,Y2,Z2,0)
-    W_0ZZ = triple_dif(U_0ZZ,X1,Y1,Z1,X2,Y2,Z2,0)
+            Ux = lambda X, Y, Z, func_val: \
+            (Z**(q+1)*func_val[1] - func_val[3]) / (q+1)
 
-    # Výpočet koeficientov polynómu
-    c0, dc0, ddc0 = c_coef(N,0,0,Z2,rho_s,rho_gradient) # v tomto prípade by mali byť koeficienty dc0 a ddc0 nulové
+            Uy = lambda X, Y, Z, func_val: \
+            (Z**(q+1)*func_val[2] - func_val[4]) / (q+1)
 
-    # Výpočet počiatočných hodnôt gravitačného účinku (homogénna prizma)
-    V0 = c0 * W_0
+            Uz = lambda X, Y, Z, func_val: \
+            -Z**(q+1) * func_val[5] + Z**q * (Y * func_val[5] + X * func_val[1])
 
-    g_x0 = c0 * W_0X
-    g_y0 = c0 * W_0Y
-    g_z0 = (c0 * W_0Z) + (dc0 * W_0)
+            Uxx = lambda X, Y, Z, func_val: \
+            X * func_val[1]
 
-    G_XX0 = c0 * W_0XX
-    G_XY0 = c0 * W_0XY
-    G_YY0 = c0 * W_0YY
-    G_XZ0 = (c0 * W_0XZ) + (dc0 * W_0X)
-    G_YZ0 = (c0 * W_0YZ) + (dc0 * W_0Y)
-    G_ZZ0 = (c0 * W_0ZZ) + (dc0 * W_0Z) + (ddc0 * W_0)
+            Uxy = lambda X, Y, Z, func_val: \
+            func_val[0]
 
-    if N == 0:          # v prípade homogénnej prizmy vrátiť hodnoty pre N=0 a ukončiť program
-        V = V0
+            Uxz = lambda X, Y, Z, func_val: \
+            Z**q * func_val[1]
 
-        g = np.array([g_x0,g_y0,g_z0])
+            Uyy = lambda X, Y, Z, func_val: \
+            Y * func_val[2]
 
-        G = np.array([[G_XX0, G_XY0, G_XZ0],
-                      [0    , G_YY0, G_YZ0], 
-                      [0    , 0    , G_ZZ0]])
+            Uyz = lambda X, Y, Z, func_val: \
+            Z**q * func_val[2]
+
+            Uzz = lambda X, Y, Z, func_val: \
+            -(q + 1)*Z**q * func_val[5] + q * Z**(q-1) * (Y*func_val[2] + X*func_val[1])
         
-        # print("Calculating homogenous prism")
-        return V, g, G
-    else:
-        # ---------- Nehomogénna prizma ------------- # 
-        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        # Tu si skončil naposledy, treba doprogramovať skript na výpočet g. účinku nehomogénnej prizmy, 
-        # ostatné funkcie by mali fungovať fajn, pred tým ako začneš, zamysli sa nad indexmi v cm, konkrétne 
-        # N - m, hoc pri N=1 môžeš použiť W_0 pri sumácií, nemôžeš použiť c0 pretože N už nie je 0 ale 1. 
-        # nájdi preto nejaký rozumný spôsob ako pripojiť W_0 k sumácií nehomogénnej prizmy (c_coef musia 
-        # byť použité nanovo), zároveň to skús future-proofnuť ak by si v budúcnosti bol moc premotivovaný 
-        # a chcel skúsiť exponenciálnu hustotu, alebo vyšší polynóm abo niečo také.
+        # Aplikácia operátora trojitej diferencie
+        
+        W = triple_dif(U,X1,Y1,Z1,X2,Y2,Z2,q)                                                                # (9)                                                                                                    
 
+        Wx = -(triple_dif(Ux,X1,Y1,Z1,X2,Y2,Z2,q))                                                           # (20)
+        Wy = -(triple_dif(Uy,X1,Y1,Z1,X2,Y2,Z2,q))
+        Wz = -(triple_dif(Uz,X1,Y1,Z1,X2,Y2,Z2,q))  
 
-     #   U_1 = lambda X, Y, Z, func_val_1: \
-     #   -((Z**(1+2) * func_val_1[5]) / (1 + 2)) + ((Z**(1+1) * ((Y * func_val_1[2]) + (X * func_val_1[1]))) / (1 + 1)) \
-     #   - (((Y * func_val_1[4]) + (X * func_val_1[3])) / ((1 + 1) * (1 + 2)))
-     # 
-     #   W_1 = triple_dif(U_1,X1,Y1,Z1,X2,Y2,Z2,N,homogenous=False)     
+        Wxx = triple_dif(Uxx,X1,Y1,Z1,X2,Y2,Z2,q)
+        Wxy = triple_dif(Uxy,X1,Y1,Z1,X2,Y2,Z2,q)
+        Wxz = triple_dif(Uxz,X1,Y1,Z1,X2,Y2,Z2,q)
+        Wyy = triple_dif(Uyy,X1,Y1,Z1,X2,Y2,Z2,q)
+        Wyz = triple_dif(Uyz,X1,Y1,Z1,X2,Y2,Z2,q)
+        Wzz = triple_dif(Uzz,X1,Y1,Z1,X2,Y2,Z2,q)
 
-     # g = np.array([g_x,g_y,g_z])   # vloženie do vektora (tuple)
-     # 
-     # G = np.array([[G_xx, G_xy, G_xz],     # xx   xy    xz       # vloženie do matice
-     #               [0   , G_yy, G_yz],     # yx   yy    yz
-     #               [0   , 0   , G_zz]])    # zx   zy    zz
+        # Výpočet koeficientov polynómu
+        c, dc, ddc = c_coef(N,q,q,Z2,rho_s,rho_gradient)
 
-        return None
+        # Výpočet hodnôt gravitačného účinku (pripočítanie ku iniciálnej hodnote)
+        V += c * W
 
+        g_x += c * Wx
+        g_y += c * Wy
+        g_z += (c * Wz) + (dc * W)
+
+        G_XX += c * Wxx
+        G_XY += c * Wxy
+        G_YY += c * Wyy
+        G_XZ += (c * Wxz) + (dc * Wx)
+        G_YZ += (c * Wyz) + (dc * Wy)
+        G_ZZ += (c * Wzz) + (dc * Wz) + (ddc * W)
+
+    # Vloženie do array
+    g = np.array([g_x,g_y,g_z])
+    
+    G = np.array([[G_XX, G_XY, G_XZ],
+                  [0    , G_YY, G_YZ], 
+                  [0    , 0    , G_ZZ]])
+        
+    return V, g, G
 
 def c_coef(N, m, n, z, rho_s, rho_gradient):
     # INPUTs: 
