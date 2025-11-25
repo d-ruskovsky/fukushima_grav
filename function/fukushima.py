@@ -86,18 +86,18 @@ def Fukushima(coor_prism,coor_point,rho_s,rho_gradient,N):
     
     # Aplikácia operátora trojitej diferencie
 
-    W_0 = triple_dif(U_0,X1,Y1,Z1,X2,Y2,Z2,N=0)                                                                # (9)                                                                                                    # (13)
+    W_0 = triple_dif(U_0,X1,Y1,Z1,X2,Y2,Z2,0)                                                                # (9)                                                                                                    # (13)
 
-    W_0X = -(triple_dif(U_0x,X1,Y1,Z1,X2,Y2,Z2,N=0))                                                           # (20)
-    W_0Y = -(triple_dif(U_0y,X1,Y1,Z1,X2,Y2,Z2,N=0))
-    W_0Z = -(triple_dif(U_0z,X1,Y1,Z1,X2,Y2,Z2,N=0))  
+    W_0X = -(triple_dif(U_0x,X1,Y1,Z1,X2,Y2,Z2,0))                                                           # (20)
+    W_0Y = -(triple_dif(U_0y,X1,Y1,Z1,X2,Y2,Z2,0))
+    W_0Z = -(triple_dif(U_0z,X1,Y1,Z1,X2,Y2,Z2,0))  
     
-    W_0XX = triple_dif(U_0XX,X1,Y1,Z1,X2,Y2,Z2,N=0)
-    W_0XY = triple_dif(U_0XY,X1,Y1,Z1,X2,Y2,Z2,N=0)
-    W_0XZ = triple_dif(U_0XZ,X1,Y1,Z1,X2,Y2,Z2,N=0)
-    W_0YY = triple_dif(U_0YY,X1,Y1,Z1,X2,Y2,Z2,N=0)
-    W_0YZ = triple_dif(U_0YZ,X1,Y1,Z1,X2,Y2,Z2,N=0)
-    W_0ZZ = triple_dif(U_0ZZ,X1,Y1,Z1,X2,Y2,Z2,N=0)
+    W_0XX = triple_dif(U_0XX,X1,Y1,Z1,X2,Y2,Z2,0)
+    W_0XY = triple_dif(U_0XY,X1,Y1,Z1,X2,Y2,Z2,0)
+    W_0XZ = triple_dif(U_0XZ,X1,Y1,Z1,X2,Y2,Z2,0)
+    W_0YY = triple_dif(U_0YY,X1,Y1,Z1,X2,Y2,Z2,0)
+    W_0YZ = triple_dif(U_0YZ,X1,Y1,Z1,X2,Y2,Z2,0)
+    W_0ZZ = triple_dif(U_0ZZ,X1,Y1,Z1,X2,Y2,Z2,0)
 
     # Výpočet koeficientov polynómu
     c0, dc0, ddc0 = c_coef(N,0,0,Z2,rho_s,rho_gradient) # v tomto prípade by mali byť koeficienty dc0 a ddc0 nulové

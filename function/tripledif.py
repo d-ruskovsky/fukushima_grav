@@ -145,7 +145,7 @@ def elemfun_n(X,Y,Z,N):
 
 
 
-def triple_dif(equation,X1,Y1,Z1,X2,Y2,Z2,*args,N):
+def triple_dif(equation,X1,Y1,Z1,X2,Y2,Z2,N,*args):
 
     # funkcia trojitej diferencie aplikuje operátor podľa vzťahu Fukushima (11) 
 
