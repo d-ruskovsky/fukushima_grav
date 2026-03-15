@@ -1,255 +1,298 @@
+import logging
 import numpy as np
-from tripledif import * # dotatočná knižnica 
-import math             # na binomický koeficient math.comb()
+import math
 
-# Knižnica fukushima (WIP) 
-# cieľom je výpočet gravitačného účinku (gravitačný potenciál, zrýchlenie, tenzor) pravouhlej prizmy s vertikálne premenlivou hustotou
- 
-# Vzťahy obsiahnuté v tomto skripte sú prevzaté z článkov:
-#
-#   1.   Fukushima 2018 : Recursive computation of gravitational field of a right rectangular parallelepiped with density varying vertically by following an arbitrary degree polynomial
-#   2.   Goossens et al 2020 : High-resolution gravity field models from GRAIL data and implications for models of the density structure of the Moons crust
+# Create a logger for the whole library
+logger = logging.getLogger("Fukushima")
 
-# Knižnica aktuálne obsahuje funkcie:
-#       fukushima()     - hlavná funkcia, výpočet gravitačného účinku prizmy na výpočtový bod
-#       c_coef()        - výpočet koeficientov polynómu hustoty
-#       density()       - výpočet hustoty pre daný polynóm
+def setup_logger(debug):
+    """
+    This function creates a logger for the bellow functions - only to be used for debugging.
+    """
+    # Logger usage - info for debug mode, else only use warning
+    logger.setLevel(logging.INFO if debug else logging.WARNING)
+    # Formater for logging messeages
+    formatter = logging.Formatter('%(asctime)s | %(funcName)s | %(message)s', datefmt='%H:%M:%S')
 
-# TO DO LIST: 
-# 
-#       upraviť tripledif - nepáči sa mi potreba písania N= , a ani args*
-#
-#       prerobiť funkcie z formátu lambda na formát def fx return..
-#
-#       skúsiť zjednotiť indexy m,n  pri c_coef - alebo lepšie pochopiť indexy
-#       
-#       prekonzultovať rozvinutie hustoty nad stupeň 1
-#
-#       prekonzultovať rozdiel medzi súradnicou z   a hĺbkou depth
+    if not logger.handlers:
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
 
-def Fukushima(coor_prism,coor_point,rho_s,rho_gradient,N):
 
-    # INPUTs: 
-    #           "coor_prism"        - 3D karteziánske súradnice okrajov pravouhlej prizmy vo tvare "x1,x2,y1,y2,z1,z2" (vektor s 6 hodnotami), resp. doména prizmy
-    #           "coor_point"        - 3D karteziánske súradnice výpočtového bodu (vektor s 3 hodnotami)
-    #           "rho_s"             - hustota na povrchu prizmy v jednotách kg/m3
-    #           "rho_gradient"      - gradient hustoty v jednotkách kg/m3/m
-    #           "N"                 - stupeň polynómu modelujúceho hustotu
+def Fukushima(prism,point,density,mode=1,debug=False):
+    """
+    Function calculates the gravitational effect (potential V, acceleration g, tensor G) of a right rectangular 
+    parallelepiped (prism) with a vertically varying density set by a arbitrary degree polynomial, based on an article 
+    by Toshio Fukushima, DOI: 10.1093/gji/ggy317. 
 
-    # OUTPUTs:
-    #           "V"                 - gravitačný potenciál generovaný prizmou vo výpočtovom bode
-    #           "g"                 - vektor gravitačného zrýchlenia generujúceho prizmou vo výpočtovom bode
-    #           "G"                 - tenzor gravitačného zrýchlenia generujúceho prizmou vo výpočtovom bode
+    Inputs:
+    prism   ... list of 6 values,   the domain of the prism within the set coordinate system, x1,x2,y1,y2,z1,z2
+    point   ... list of 3 values,   the coordinates of the evaluation point x,y,z
+    density ... list of n values,   the coefficients of the chosen density polynomial, rho_0,rho_1 ... rho_n
+    mode    ... int,                1 (default) - compute gravitational potential only, 2 - gravitational potential + acceleration, 3 - potential + acceleration + tensor
+    debug   --- boolean,            default set to False, True for using logger package to print each step of the calculation
 
-    # Elementárne funkcie U sú transformované na W pomocou funkcie triple_dif, ktorá si volá funkcie elemfun
-    # Keďže tieto funkcie vyžadujú rôzne kombinácie parametrov a súradníc je na ich fungovanie potrebné 
-    # zadefinovať elementárne funkcie U pomocou anonýmnej funkcie lambda alebo pomocou bežnej funkcie def, 
-    # musia však mať definované parametre pomocou func_val v poradí v akom elemfun vracia funkcie ABCDEFR.
-    # Nižšie sú preto tieto parametre zoradené, pre lepšie pochopenie zostavenia vzťahov U v samotnom výpočte. 
+    Outputs (based on mode set):
+    V       ... int,    gravitational potential effect of the prism on the evaluation point
+    g       ... list,   gravitational acceleration vector, [g_x, g_y, g_z]
+    G       ... list,   gravitational tensor, [g_xx, g_xy, g_xz, g_yy, g_yz, g_zz]
+    """
 
-    #  elemfun
-    #  A, B, C, D, E, F, R
-    #  0, 1, 2, 3, 4, 5, 6
+    # Check if prism value set correctly - to do
 
-    # ================================== F U N K C I A ================================================== #
-
-    X1, Y1, Z1 = coor_prism[0] - coor_point[0], coor_prism[2] - coor_point[1], coor_prism[4] - coor_point[2]                # (10) posunutie "shifted endpoints"
-    X2, Y2, Z2 = coor_prism[1] - coor_point[0], coor_prism[3] - coor_point[1], coor_prism[5] - coor_point[2] 
-
-    # ---------- Homogénna prizma ------------- # 
-
-    # Váhové funkcie  - počiatočné hodnoty
-
-    # Potenciál - V ------
-    # U = lambda X, Y, Z, func_val_0: \
-    #    -((X**2 * func_val_0[0]) + (Y**2 * func_val_0[1]) + (Z**2 * func_val_0[2])) / 2 + \
-    #          (Y * Z * func_val_0[3]) + (Z * X * func_val_0[4]) + (X * Y * func_val_0[5])                     # (23) ako anonýmna funkcia lambda
+    # Check if point value set correctly - to do 
     
-    def U(X, Y, Z, func_val):                                                                                  # (23) funckia prerobená 
-        return(
-            -((X**2 * func_val[0]) + (Y**2 * func_val[1]) + (Z**2 * func_val[2])) / 2 +
-            (Y * Z * func_val[3]) + (Z * X * func_val[4]) + (X * Y * func_val[5])
-        )
-
-    # Zrýchlenie - g ------ 
-    Ux = lambda X, Y, Z, func_val_0: \
-            -(X * func_val_0[0]) + (Y * func_val_0[5]) + (Z * func_val_0[4])                                 # (23)
-
-    Uy = lambda X, Y, Z, func_val_0: \
-            (X * func_val_0[5]) - (Y * func_val_0[1]) + (Z * func_val_0[3])
+    # Check if mode value set correctly
+    if mode not in [1, 2, 3]:
+        raise ValueError(f"Incorrect mode set: {mode}, allowed values: 1 (V), 2 (V+g), 3 (V+g+G). See documentation for further information.")
     
-    Uz = lambda X, Y, Z, func_val_0: \
-            (X * func_val_0[4]) + (Y * func_val_0[3]) - (Z * func_val_0[2])
+    # Set up logger for the main function
+    setup_logger(debug)
     
-    # Tenzor - T ------
-    Uxx = lambda X, Y, Z, func_val_0: \
-                -func_val_0[0]
+    # Calculated values according to set mode
+    if mode==1:
+        logger.info("Starting calculation of gravitational potential V")
+
+    elif mode==2:
+        logger.info("Starting calculation of gravitational potential V, acceleration g")
+        return
     
-    Uxy = lambda X, Y, Z, func_val_0: \
-                func_val_0[5]
+    elif mode==3:
+        logger.info("Starting calculation of gravitational potential V, acceleration g, tensor G")
+        return
     
-    Uxz = lambda X, Y, Z, func_val_0: \
-                func_val_0[4]
+    # Shifting endpoints/vertices - (eq.10)
+    # expectected prism domain in list - [x1,x2,y1,y2,z1,z2]
+    #                                    [0, 1, 2, 3, 4, 5 ]
+    # expected point coordinates in list - [x, y, z]
+    #                                      [0, 1, 2]
+    X1 = prism[0] - point[0]
+    X2 = prism[1] - point[0]
+
+    Y1 = prism[2] - point[1]
+    Y2 = prism[3] - point[1]
+
+    Z1 = prism[4] - point[2]
+    Z2 = prism[5] - point[2]
+    logger.info(f"Shifting endpoints - X1({X1}),X2({X2}),Y1({Y1}),Y2({Y2}),Z1({Z1}),Z2({Z2})")
+
+    # Unpacking density polynomial degree
+    # expected polynomial coefficients in 'density' list 
+    N = len(density) - 1
+    logger.info(f"Polynomial degree N set to {N}, polynomial coefficients: {density}")
     
-    Uyy = lambda X, Y, Z, func_val_0: \
-                -func_val_0[1]
-    
-    Uyz = lambda X, Y, Z, func_val_0: \
-                func_val_0[3]
-    
-    Uzz = lambda X, Y, Z, func_val_0: \
-                -func_val_0[2]
-    
-    # Inicializácia gravitačného účinku do cyklu
-    V,g_x,g_y,g_z,G_XX,G_XY,G_YY,G_XZ,G_YZ,G_ZZ  = (0,) * 10
+    # Calculating gravitational effect of prism in evaluation point
+    V = 0 # inicialize value for recursive computation
 
-    for q in range(N+1):
-        # Kontrola homogenity - ak je q 0 tak je prizma homogénna - použijú sa vzťahy pre homogénnu prizmu
-        if q > 0:
-            
-            def U(X, Y, Z, func_val):
-                return (
-                    -((Z**(q+2) * func_val[2]) / (q+2))
-                    + ((Z**(q+1) * (Y*func_val[3] + X*func_val[4])) / (q+1))
-                    - ((Y*func_val[3] + X*func_val[4]) / ((q+1)*(q+2))) )
-            
-            Ux = lambda X, Y, Z, func_val: \
-            (Z**(q+1)*func_val[4] - func_val[4]) / (q+1)
+    for m in range(N + 1):
+        logger.info(f"--Starting calculation, loop {m} of {N}")
 
-            Uy = lambda X, Y, Z, func_val: \
-            (Z**(q+1)*func_val[3] - func_val[3]) / (q+1)
+        # Calculate the polynomial coefficient for current loop
+        c = c_coef(N, m, (prism[5]+Z2), density) # WINNER -------
+        logger.info(f"Returned from function c_coef(), c = {c}, loop {m} of {N}")
 
-            Uz = lambda X, Y, Z, func_val: \
-            -Z**(q+1) * func_val[2] + Z**q * (Y * func_val[3] + X * func_val[4])
+        # Calculate the weight function for the current loop
+        W = weight_fun(X1,X2,Y1,Y2,Z1,Z2,m)
+        logger.info(f"Returned from function weight_fun(), W = {W}, loop {m} of {N}")
 
-            Uxx = lambda X, Y, Z, func_val: \
-            X * func_val[4]
-
-            Uxy = lambda X, Y, Z, func_val: \
-            func_val[6]
-
-            Uxz = lambda X, Y, Z, func_val: \
-            Z**q * func_val[4]
-
-            Uyy = lambda X, Y, Z, func_val: \
-            Y * func_val[3]
-
-            Uyz = lambda X, Y, Z, func_val: \
-            Z**q * func_val[3]
-
-            Uzz = lambda X, Y, Z, func_val: \
-            -(q + 1)*Z**q * func_val[2] + q * Z**(q-1) * (Y*func_val[3] + X*func_val[4])
-        
-        # Aplikácia operátora trojitej diferencie
-        
-        W = triple_dif(U,X1,Y1,Z1,X2,Y2,Z2)                                                                # (9)                                                                                                    
-       
-        Wx = -(triple_dif(Ux,X1,Y1,Z1,X2,Y2,Z2))                                                           # (20)
-        Wy = -(triple_dif(Uy,X1,Y1,Z1,X2,Y2,Z2))
-        Wz = -(triple_dif(Uz,X1,Y1,Z1,X2,Y2,Z2))  
-
-        Wxx = triple_dif(Uxx,X1,Y1,Z1,X2,Y2,Z2)
-        Wxy = triple_dif(Uxy,X1,Y1,Z1,X2,Y2,Z2)
-        Wxz = triple_dif(Uxz,X1,Y1,Z1,X2,Y2,Z2)
-        Wyy = triple_dif(Uyy,X1,Y1,Z1,X2,Y2,Z2)
-        Wyz = triple_dif(Uyz,X1,Y1,Z1,X2,Y2,Z2)
-        Wzz = triple_dif(Uzz,X1,Y1,Z1,X2,Y2,Z2)
-
-        # Výpočet koeficientov polynómu
-        c, dc, ddc = c_coef(N,q,q,Z2,rho_s,rho_gradient)
-
-        # Výpočet hodnôt gravitačného účinku (pripočítanie ku iniciálnej hodnote)
+        # Gravitational potential - (eq.13)
         V += c * W
+        logger.info(f"V = {V}, loop {m} of {N}")
+    # END of loop
 
-        g_x += c * Wx
-        g_y += c * Wy
-        g_z += (c * Wz) + (dc * W)
+    # END of main function
+    return V
 
-        G_XX += c * Wxx
-        G_XY += c * Wxy
-        G_YY += c * Wyy
-        G_XZ += (c * Wxz) + (dc * Wx)
-        G_YZ += (c * Wyz) + (dc * Wy)
-        G_ZZ += (c * Wzz) + (dc * Wz) + (ddc * W)
 
-    # Vloženie do array
-    g = np.array([g_x,g_y,g_z])
-    
-    G = np.array([[G_XX, G_XY, G_XZ],
-                  [0    , G_YY, G_YZ], 
-                  [0    , 0    , G_ZZ]])
+def c_coef(N,m,z,density):
+    """
+    Calculates the value of polynomial coefficient for the specific loop set by Fukushima()
+
+    Inputs:
+    N       ... int, the degree of the density polynomial used
+    m       ... int, currently calculated loop
+    z       ... int, the Z coordinate of the prism - more correctly the height of the prism
+    density ... list of n values, same as Fukushima()
+
+    Outputs:
+    cm      ... int, m-th coefficient of the density polynomial
+    """
+
+    cm = 0 # inicialize value of the coeficients for recursive computation
+    cmj = 0
+
+    for j in range(N-m+1):
+        logger.info(f"Starting polynomial coefficient calculation, loop {j} out of (N - m) = {N - m} loops")
         
-    return V, g, G
+        # j-th coeficient as defined by (eq.15)
+        cmj = math.comb((j + m), m) * (6.67430 * 10**-11) * density[(j+m)] # used G - Newtons constant of universal attraction, source B.Bucha Fyzikálna Geodézia 2023
+        logger.info(f"Calculation of cmj = {cmj}, for loop {j} out of (N - m) {N - m}")
 
-def c_coef(N, m, n, z, rho_s, rho_gradient):
-    # INPUTs: 
-    #           "N"                 - stupeň polynómu modelujúceho hustotu
-    #           "m"                 - aktuálny krok pri sumácií výpočtu grav. potenciálu
-    #           "n"                 - aktuálny krok pri sumácií výpočtu g rav. zrýchlenia a tenzora
-    #           "z"                 - súradnice z prizmy (aktuálne taktiež hĺbka - depth)
-    #           "rho_s"             - hustota na povrchu prizmy v jednotkách kg/m3
-    #           "rho_gradient"      - gradient hustoty v jednotkách kg/m3/m
+        # m-th coeficient as defined by (eq.14)
+        cm += cmj * (z**j)
+        logger.info(f"Calculation of cm = {cm}, for loop {j} out of (N - m) = {N - m}")
 
-    # OUTPUTs:
-    #           "c, dc, ddc"        - koeficient (a jeho derivácie) polynómu hustoty 
+    # END of loop
+    return cm
+
+
+def weight_fun(X1,X2,Y1,Y2,Z1,Z2,n):
+    """
+    Works as a bridge between several functions, picking the correct potential function and 
+    returning the function after the triple difference operator has been applied to it.
+
+    Inputs:
+    X1,X2,Y1,Y2,Z1,Z2   ... shifted endpoints, the domain of the prism shifted by the coordinates of the evaluation point (eq.10)
+    n                   ... currently calculated loop
+
+    Outputs:
+    W                   ... selected potential function evaluated with specified shifted endpoints using triple difference operator (eq.11)
+    """
+
+    if n == 0:
+        logger.info(f"Used potential function for homogenous prism, n = {n}")
+        # Potential function for a homogenous prism (eq.23)
+        def U(X,Y,Z):
+            e = elem_fun(X, Y, Z, n)
+            return -((X**2 * e["A"]) + (Y**2 * e["B"]) + (Z**2 * e["C"]))/2 + Y * Z * e["D"][0] + Z * X * e["E"][0] + X * Y * e["F"]
     
-    G = 6.67430 * 10**-11           # Newtonova gravitačná konštanta (zdr. Bucha, Fyzikálna Geodézia 2023)   
+    if n >= 1:
+        logger.info(f"Used potential function for nonhomogenous prismn, n = {n}")
+        # Potential function for a non-homogenous prism (eq.26)
+        def U(X,Y,Z): 
+            e = elem_fun(X, Y, Z, n)
+            return -((Z**(n+2) * e["C"])/(n + 2)) + ((Z**(n+1) * (Y * e["D"][1] + X * e["E"][1]))/(n + 1)) - ((Y * e["D"][n+2] + X * e["E"][n+2])/((n + 1) * (n + 2)))
 
-    c = 0
-    dc = 0
-    ddc = 0
+    return triple_dif(U,X1,X2,Y1,Y2,Z1,Z2)
 
-    # Koeficient c
-    for j in range(0, N - m + 1):
-        rho = density(rho_s, rho_gradient, z, j+m)
-        cmj = math.comb(j + m, m) * G * rho                                     # (15)        # !!! používam z ako depth, skonzultovať či je to správne - takmer určite nie
-        c += cmj * (z**j)                                                       # (14)
 
-    # Koeficient c'  - v tomto bode sú v článku koeficienty označované ako c'nm c''nm, ja ich označujem ako c'nj c''nj keďže m používa koef. c, vzťahy sú inak nemenné - taktiež asi nesprávne 
-    if N - n - 1 >= 0:
-        for j in range(0,N - n - 1 + 1):
-            rho = density(rho_s, rho_gradient, z, n + j + 1)
-            dcnj = (j + 1) * math.comb(n + j + 1, n) * G * rho                                           # (19)
-            dc += dcnj * (z**j)                                                                          # (18)
+def elem_fun(X,Y,Z,n):
+    """
+    Calculates the elementary functions of the specific coordinate combination for a set degree(loop). 
+    Elementary functions A,B,C,F are evaluated as integers, given they are not computed recursively. 
+    Elementary functions D,E,R are evaluated as lists, starting at [0] for n=0 (homogenous prism) 
+    and ending at [n+2] as required by potential functions. These can then be called easily, for example
+    elementary["D"][2] will return the value of the elementary function D for n=2. 
+
+    Inputs:
+    X,Y,Z       ... int, coordinates
+    n           ... currently calculated loop
+
+    Outputs:
+    elementary  ... dict, comprised of ints (A,B,C,F) and lists (D,E,R) evaluated for the specific coordinates and degree/loop (n+2)
+
+    """
+    logger.info(f"Calculating elementary functions for X = {X}, Y = {Y}, Z = {Z}. Loop {n}")
+
+    # Squared sum of the horizontal coordinates (eq.31)
+    S = X**2 + Y**2
+
+    # Initial values for elementary functions (eq.36)
+    A = atan3(X,Y,Z)
+    B = atan3(Y,Z,X)
+    C = atan3(Z,X,Y)
+    F = logsum(Z,X,Y)
+    D = [None] * (n + 3) # Note: creating an empty list to fill using recursive computation
+    E = [None] * (n + 3)
+    R = [None] * (n + 3)
+
+    D[0] = logsum(X,Y,Z)
+    E[0] = logsum(Y,Z,X)
+    R[0] = np.sqrt(X**2 + Y**2 + Z**2 + (10**-150)) # Note: value 10**-150 is defined as omega (eq.39) - using the value directly
+
+    logger.info(f"Initial values of elementary functions: A:{A},B:{B},C:{C},D:{D[0]},E:{E[0]},F:{F},R:{R[0]}")
+
+    # Recursive computation uses elementary functions of a homogenous prism as initial values (eq.28,30)
+    D[1] = D[0]
+    E[1] = E[0]
+    R[1] = R[0]
+
+    # Second degree elementary functions also have specific equations (eq.28,30)
+    D[2] = Y*B - X*F
+    E[2] = X*A - Y*F
+    R[2] = (Z*R[0] - S*F)/2
+
+    logger.info(f"Elementary functions for n=2, D[2]:{D[2]},E[2]:{E[2]},R[2]:{R[2]}")
+
+    logger.info(f"Starting recursive computation of elementary functions")
+    for m in range(3,n + 2 + 1): # + 2 for the need of _n+2, + 1 for Python - check later if correct
+
+        # Note: this loop starts at 3, given values for n=2 are already evaluated. The loop therefore 
+        # starts at 3 and continues to calculate recursively until n+2 as required by potential
+        # functions (eq.26) and (eq.33)
+
+        R[m] = (Z**(m-1) * R[0] - (m - 1) * S * R[m-2])/m   # (eq.29)
+        D[m] = -Y**2 * D[m-2] - X * R[m-2]                  # (eq.27)
+        E[m] = -X**2 * E[m-2] - Y * R[m-2]                  # (eq.27)
+
+        logger.info(f"Elementary functions for n={m}, D[{m}]:{D[m]},E[{m}]:{E[m]},R[{m}]:{R[m]}")
+
+    # END of loop
+        
+    return {"R":R, "A":A, "B":B, "C":C, "D":D, "E":E, "F":F}
+
+
+def triple_dif(function,X1,X2,Y1,Y2,Z1,Z2):
+    """
+    Evaluates a potential function set by weight_fun() for a specific vertex set by
+    the vertexes coordinates (shifted endpoints), then applies the triple difference (eq.11) operator to it.
+
+    Inputs:
+    function            ... object, the equation/potential function, set by weigth_fun()
+    X1,X2,Y1,Y2,Z1,Z2   ... int, shifted endpoints, the domain of the prism shifted by the coordinates of the evaluation point (eq.10)
+
+    Outputs:
+    triple difference   ... int, potential function evaluated for specific vertex, with the operator already applied
+    """
+    
+    logger.info(f"Triple difference applied for function {function},X1({X1}),X2({X2}),Y1({Y1}),Y2({Y2}),Z1({Z1}),Z2({Z2}")
+
+    return function(X2,Y2,Z2) - function(X2,Y2,Z1) - function(X2,Y1,Z2) + function(X2,Y1,Z1) \
+            - function(X1,Y2,Z2) + function(X1,Y2,Z1) + function(X1,Y1,Z2) - function(X1,Y1,Z1)
+
+
+def atan3(X,Y,Z):
+    """
+    Calculates the arcus tangents of specified X,Y,Z coordinates, while 
+    using the switch structure for returning a 0 if the xi coordinate is also 0 (eq.37)
+
+    Inputs:
+    X,Y,Z   ... int, coordinates
+
+    Outputs:
+    atan3   ... int, the arcus tangents value
+    """
+    # Possibly worth noting that the coordinates are written as xi, eta and zeta in the article.
+    # Or maybe not worth noting, but note it I shall nonetheles. 
+
+    logger.info(f"Evaluating the arcus tangents of X:{X},Y:{Y},Z:{Z}")
+
+    if X == 0:
+        return 0
     else:
-        dc = 0
+       return np.arctan((Y * Z) / (X * np.sqrt(X**2 + Y**2 + Z**2 )))  
+    
+def logsum(X,Y,Z):
+    """
+    Calculates the natural logarithm of specified X,Y,Z coordinates, while 
+    using the switch structure for changing the equation structure to prevent numerical errors. (eq.38)
 
+    Inputs:
+    X,Y,Z       ... int, coordinates
 
-    # Koeficient c''
-    if N - n - 2 >= 0:
-        for j in range(0,N - n - 2 + 1):
-            rho = density(rho_s, rho_gradient, z, n + j + 2)
-            ddcnj = (j + 2) * (j + 1) * math.comb(n + j + 2, n) * G * rho                                # (19)
-            ddc += ddcnj * (z**j)                                                                       # (18)
+    Outputs:
+    logsum      ... int, the natural logarithm value
+    """
+    # Value 10**-150 in the article is defined as omega "tiny positive constant". Decided to use the value 
+    # in the function directly instead of creating a separate variable to prevent needless re-defining 
+    # of the variable at each loop. 
+
+    logger.info(f"Evaluating the natural logarithm of X:{X},Y:{Y},Z:{Z}")
+
+    if X > 0:
+        return np.log(X + np.sqrt(X**2 + Y**2 + Z**2))
+    elif X == 0:
+        return (1/2) * np.log(Y**2 + Z**2 + (10**-150))
     else:
-        ddc = 0
-
-
-    return c, dc, ddc
-
-
-def density(rho_s, rho_gradient, depth, N):
-    # INPUTs: 
-    #           "rho_s"             - hustota na povrchu prizmy v jednotách kg/m3
-    #           "rho_gradient"      - gradient hustoty v jednotkách kg/m3/m
-    #           "depth"             - hĺbka, resp. obrátená súradnice z počítanej prizmy
-    #           "N"                 - stupeň polynómu modelujúceho hustotu
-
-    # OUTPUTs:
-    #           "rho"               - výsledná hustota pre daný stupeň, hĺbku, gradient a hustotu na povrchu
-    
-    # TO DO:
-    #
-    # - konzultovať a dokončiť polynóm pri požadovanom stupni vyššom ako 1 
-
-
-    if N == 0:                                  # prípad homogénnej prizmy - vráti hustotu na povrchu
-        return rho_s
-    
-    elif N == 1:                                # prípad prizmy s lineárne premenlivou hustotou
-        rho = rho_s + rho_gradient * depth      # (6) - Goossens et al 2020
-        return rho
-    
-    else:                                       # PLACEHOLDER - v prípade potreby rho vyššieho stupňa ako 1 sa vráti stupeň 1
-        rho = rho_s + rho_gradient * depth      # tento krok treba prekonzultovať (rozšíriť na exponenciálnu funkciu? 
-        return rho                              # alebo rozšíriť Taylorom? prípadne nechať tento stupeň ?
+        return np.log((Y**2 + Z**2 + (10**-150)) / (np.sqrt(X**2 + Y**2 + Z**2) - X))
