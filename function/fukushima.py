@@ -89,15 +89,15 @@ def Fukushima(prism,point,density,mode=1,debug=False):
         logger.info(f"--Starting calculation, loop {m} of {N}")
 
         # Calculate the polynomial coefficient for current loop
-        c = c_coef(N, m, (prism[5]+Z2), density) # WINNER -------
-        logger.info(f"Returned from function c_coef(), c = {c}, loop {m} of {N}")
+        c = cCoefficient(N, m, (prism[5]+Z2), density) # WINNER -------
+        logger.info(f"Returned from function cCoefficient(), cm = {c[0]}, c'n = {c[1]}, c''n = {c[2]}, loop {m} of {N}")
 
         # Calculate the weight function for the current loop
-        W = weight_fun(X1,X2,Y1,Y2,Z1,Z2,m)
-        logger.info(f"Returned from function weight_fun(), W = {W}, loop {m} of {N}")
+        W = weigthFunction(X1,X2,Y1,Y2,Z1,Z2,m)
+        logger.info(f"Returned from function weigthFunction(), W = {W}, loop {m} of {N}")
 
         # Gravitational potential - (eq.13)
-        V += c * W
+        V += c[0] * W
         logger.info(f"V = {V}, loop {m} of {N}")
     # END of loop
 
@@ -105,9 +105,12 @@ def Fukushima(prism,point,density,mode=1,debug=False):
     return V
 
 
-def c_coef(N,m,z,density):
+def cCoefficient(N,m,z,density):
     """
-    Calculates the value of polynomial coefficient for the specific loop set by Fukushima()
+    Calculates the value of polynomial coefficients and their 1st and 2nd derivatives for the specific loop set by Fukushima().
+    Derivatives are only calculated if the polynomial is of a sufficiently high degree (1st derivative requires N<0, 2nd derivative 
+    requires N<1). Furthermore the indexing of the derivatives is slightly changed to maintain consistency within the function.
+    Indexes changed from article to function (article = function) -> m = j, n = m (only applies to derivatives). 
 
     Inputs:
     N       ... int, the degree of the density polynomial used
@@ -116,13 +119,19 @@ def c_coef(N,m,z,density):
     density ... list of n values, same as Fukushima()
 
     Outputs:
-    cm      ... int, m-th coefficient of the density polynomial
+    [cm,cn_,cn__]      ... list, m-th coefficient (cm), n-th 1st (cn_) and 2nd (cn__) derivatives of the density polynomial
     """
 
     cm = 0 # inicialize value of the coeficients for recursive computation
     cmj = 0
 
-    for j in range(N-m+1):
+    cn_ = 0 # inicialize values of the 1st derivatives of polynomial coefficients
+    cnm_ = 0
+
+    cn__ = 0 # inicialize values of the 2nd derivatives of polynomial coefficients
+    cnm__ = 0
+
+    for j in range(N - m + 1):
         logger.info(f"Starting polynomial coefficient calculation, loop {j} out of (N - m) = {N - m} loops")
         
         # j-th coeficient as defined by (eq.15)
@@ -134,10 +143,48 @@ def c_coef(N,m,z,density):
         logger.info(f"Calculation of cm = {cm}, for loop {j} out of (N - m) = {N - m}")
 
     # END of loop
-    return cm
+
+    # Note: the article uses n-indexes for sumations of the coefficient derivatives. Here I am keeping m-indexing 
+    # as in (eq.14,15) for consistency. 
+
+    if (N - m - 1) < 0:
+        logger.info(f"1st derivative of polynomial coefficient returning 0 as (N-n-1)={N-m-1}, must be at least 0")
+        # Since the coefficient is already defined as 0, this line simply skips the calculation instead of redefining the variable
+    else:
+        for j in range(N - m - 1 + 1): # keeping +1 (Python) and -1 (eq.18) for context
+            logger.info(f"Starting 1st derivative of the polynomial coefficient calculation, loop {j} out of (N - n - 1) = {N - m - 1}")
+
+            # m-th coefficient 1st derivative (eq.19)
+            cnm_ = (j + 1) * math.comb((m + j + 1),m) * (6.67430 * 10**-11) * density[(m+j+1)] # used G - Newtons constant of universal attraction, source B.Bucha Fyzikálna Geodézia 2023
+            logger.info(f"Calculation of c'nm = {cnm_}, for loop {j} out of (N - m - 1) {N - m - 1}")
+
+            # n-th coefficient 1st derivative (eq.18)
+            cn_ += cnm_ * (z**j)
+            logger.info(f"Calculation of c'n = {cn_}, for loop {j} out of (N - m - 1) = {N - m - 1}")
+
+    # END of loop
+
+    if (N - m - 2) < 0:
+        logger.info(f"2nd derivative of polynomial coefficient returning 0 as (N-n-2)={N-m-2}, must be at least 0")
+        # Since the coefficient is already defined as 0, this line simply skips the calculation instead of redefining the variable
+    else:
+        for j in range(N - m - 2 + 1): # keeping +1 (Python) and -2 (eq.18) for context
+            logger.info(f"Starting 2nd derivative of the polynomial coefficient calculation, loop {j} out of (N - n - 2) = {N - m - 2}")
+
+            # m-th coefficient 2nd derivative (eq.19)
+            cnm__ = (j + 2) * (j + 1) * math.comb((m + j + 2),m) * (6.67430 * 10**-11) * density[(m+j+2)] # used G - Newtons constant of universal attraction, source B.Bucha Fyzikálna Geodézia 2023
+            logger.info(f"Calculation of c''nm = {cnm__}, for loop {j} out of (N - m - 2) {N - m - 2}")
+
+            # n-th coefficient 2nd derivative (eq.18)
+            cn__ += cnm__ * (z**j)
+            logger.info(f"Calculation of c'n = {cn__}, for loop {j} out of (N - m - 2) = {N - m - 2}")
+
+    # END of loop
+
+    return [cm,cn_,cn__]
 
 
-def weight_fun(X1,X2,Y1,Y2,Z1,Z2,n):
+def weigthFunction(X1,X2,Y1,Y2,Z1,Z2,n):
     """
     Works as a bridge between several functions, picking the correct potential function and 
     returning the function after the triple difference operator has been applied to it.
@@ -154,20 +201,20 @@ def weight_fun(X1,X2,Y1,Y2,Z1,Z2,n):
         logger.info(f"Used potential function for homogenous prism, n = {n}")
         # Potential function for a homogenous prism (eq.23)
         def U(X,Y,Z):
-            e = elem_fun(X, Y, Z, n)
+            e = elementaryFunction(X, Y, Z, n)
             return -((X**2 * e["A"]) + (Y**2 * e["B"]) + (Z**2 * e["C"]))/2 + Y * Z * e["D"][0] + Z * X * e["E"][0] + X * Y * e["F"]
     
     if n >= 1:
         logger.info(f"Used potential function for nonhomogenous prismn, n = {n}")
         # Potential function for a non-homogenous prism (eq.26)
         def U(X,Y,Z): 
-            e = elem_fun(X, Y, Z, n)
+            e = elementaryFunction(X, Y, Z, n)
             return -((Z**(n+2) * e["C"])/(n + 2)) + ((Z**(n+1) * (Y * e["D"][1] + X * e["E"][1]))/(n + 1)) - ((Y * e["D"][n+2] + X * e["E"][n+2])/((n + 1) * (n + 2)))
 
-    return triple_dif(U,X1,X2,Y1,Y2,Z1,Z2)
+    return tripleDifference(U,X1,X2,Y1,Y2,Z1,Z2)
 
 
-def elem_fun(X,Y,Z,n):
+def elementaryFunction(X,Y,Z,n):
     """
     Calculates the elementary functions of the specific coordinate combination for a set degree(loop). 
     Elementary functions A,B,C,F are evaluated as integers, given they are not computed recursively. 
@@ -233,9 +280,9 @@ def elem_fun(X,Y,Z,n):
     return {"R":R, "A":A, "B":B, "C":C, "D":D, "E":E, "F":F}
 
 
-def triple_dif(function,X1,X2,Y1,Y2,Z1,Z2):
+def tripleDifference(function,X1,X2,Y1,Y2,Z1,Z2):
     """
-    Evaluates a potential function set by weight_fun() for a specific vertex set by
+    Evaluates a potential function set by weigthFunction() for a specific vertex set by
     the vertexes coordinates (shifted endpoints), then applies the triple difference (eq.11) operator to it.
 
     Inputs:
@@ -271,7 +318,7 @@ def atan3(X,Y,Z):
     if X == 0:
         return 0
     else:
-       return np.arctan((Y * Z) / (X * np.sqrt(X**2 + Y**2 + Z**2 )))  
+        return np.arctan((Y * Z) / (X * np.sqrt(X**2 + Y**2 + Z**2 )))  
     
 def logsum(X,Y,Z):
     """
