@@ -93,8 +93,8 @@ def Fukushima(prism,point,density,mode=1,debug=False):
         logger.info(f"Returned from function cCoefficient(), cm = {c[0]}, c'n = {c[1]}, c''n = {c[2]}, loop {m} of {N}")
 
         # Calculate the weight function for the current loop
-        W = weigthFunction(X1,X2,Y1,Y2,Z1,Z2,m)
-        logger.info(f"Returned from function weigthFunction(), W = {W}, loop {m} of {N}")
+        W = weightFunction(X1,X2,Y1,Y2,Z1,Z2,m)
+        logger.info(f"Returned from function weightFunction(), W = {W}, loop {m} of {N}")
 
         # Gravitational potential - (eq.13)
         V += c[0] * W
@@ -184,7 +184,7 @@ def cCoefficient(N,m,z,density):
     return [cm,cn_,cn__]
 
 
-def weigthFunction(X1,X2,Y1,Y2,Z1,Z2,n):
+def weightFunction(X1,X2,Y1,Y2,Z1,Z2,n):
     """
     Works as a bridge between several functions, picking the correct potential function and 
     returning the function after the triple difference operator has been applied to it.
@@ -198,18 +198,103 @@ def weigthFunction(X1,X2,Y1,Y2,Z1,Z2,n):
     """
 
     if n == 0:
-        logger.info(f"Used potential function for homogenous prism, n = {n}")
-        # Potential function for a homogenous prism (eq.23)
+        logger.info(f"Used potential functions for homogenous prism, n = {n}")
+        # Potential functions for a homogenous prism (eq.23)
+
+        # Gravitational potential V
         def U(X,Y,Z):
             e = elementaryFunction(X, Y, Z, n)
-            return -((X**2 * e["A"]) + (Y**2 * e["B"]) + (Z**2 * e["C"]))/2 + Y * Z * e["D"][0] + Z * X * e["E"][0] + X * Y * e["F"]
+            return -((X**2 * e["A"]) + (Y**2 * e["B"])\
+                    + (Z**2 * e["C"]))/2\
+                    + Y * Z * e["D"][0] + Z * X * e["E"][0] + X * Y * e["F"]
+        
+        # Gravitational acceleration vector g
+        def Ux(X,Y,Z):
+            e = elementaryFunction(X, Y, Z, n)
+            return - X * e["A"] + Y * e["F"] + Z * e["E"][0]
+        
+        def Uy(X,Y,Z):
+            e = elementaryFunction(X, Y, Z, n)
+            return X * e["F"] - Y * e["B"] + Z * e["D"][0]
+        
+        def Uz(X,Y,Z):
+            e = elementaryFunction(X, Y, Z, n)
+            return X * e["E"][0] + Y * e["D"][0] - Z * e["C"]
+        
+        # Gravitational force tensor G
+        def Uxx(X,Y,Z):
+            e = elementaryFunction(X, Y, Z, n)
+            return -e["A"]
+        
+        def Uxy(X,Y,Z):
+            e = elementaryFunction(X, Y, Z, n)
+            return e["F"]
+        
+        def Uxz(X,Y,Z):
+            e = elementaryFunction(X, Y, Z, n)
+            return e["E"][0]
+        
+        def Uyy(X,Y,Z):
+            e = elementaryFunction(X, Y, Z, n)
+            return -e["B"]
+        
+        def Uyz(X,Y,Z):
+            e = elementaryFunction(X, Y, Z, n)
+            return e["D"][0]
+        
+        def Uzz(X,Y,Z):
+            e = elementaryFunction(X, Y, Z, n)
+            return -e["C"]
     
     if n >= 1:
-        logger.info(f"Used potential function for nonhomogenous prismn, n = {n}")
-        # Potential function for a non-homogenous prism (eq.26)
+        logger.info(f"Used potential functions for nonhomogenous prismn, n = {n}")
+        # Potential function for a non-homogenous prism
+
+        # Gravitational potential (eq.26)
         def U(X,Y,Z): 
             e = elementaryFunction(X, Y, Z, n)
-            return -((Z**(n+2) * e["C"])/(n + 2)) + ((Z**(n+1) * (Y * e["D"][1] + X * e["E"][1]))/(n + 1)) - ((Y * e["D"][n+2] + X * e["E"][n+2])/((n + 1) * (n + 2)))
+            return -((Z**(n+2) * e["C"])/(n + 2))\
+                     + ((Z**(n+1) * (Y * e["D"][1] + X * e["E"][1]))/(n + 1))\
+                     - ((Y * e["D"][n+2] + X * e["E"][n+2])/((n + 1) * (n + 2)))
+        
+        # Gravitational acceleration vector (eq.33)
+        def Ux(X,Y,Z):
+            e = elementaryFunction(X, Y, Z, n)
+            return ((Z**(n + 1) * e["E"][0] - e["E"][n+2])/(n + 1))
+        
+        def Uy(X,Y,Z):
+            e = elementaryFunction(X, Y, Z, n)
+            return ((Z**(n + 1) * e["D"][0] - e["D"][n+2])/(n + 1))
+        
+        def Uz(X,Y,Z):
+            e = elementaryFunction(X, Y, Z, n)
+            return -Z**(n + 1) * e["C"] + Z**n * (Y * e["D"][0] + X * e["E"][0])
+        
+        # Gravitational force tensor (eq.33)
+        def Uxx(X,Y,Z):
+            e = elementaryFunction(X, Y, Z, n)
+            return X * e["E"][n]
+        
+        def Uxy(X,Y,Z):
+            e = elementaryFunction(X, Y, Z, n)
+            return e["R"][n]
+        
+        def Uxz(X,Y,Z):
+            e = elementaryFunction(X, Y, Z, n)
+            return Z**n * e["E"][0]
+        
+        def Uyy(X,Y,Z):
+            e = elementaryFunction(X, Y, Z, n)
+            return Y * e["D"][n]
+        
+        def Uyz(X,Y,Z):
+            e = elementaryFunction(X, Y, Z, n)
+            return Z**n * e["D"][0]
+        
+        def Uzz(X,Y,Z):
+            e = elementaryFunction(X, Y, Z, n)
+            return -(n + 1) * Z**n * e["C"] + n * Z**(n - 1) * (Y * e["D"][0] + X * e["E"][0])
+        
 
     return tripleDifference(U,X1,X2,Y1,Y2,Z1,Z2)
 
@@ -282,11 +367,11 @@ def elementaryFunction(X,Y,Z,n):
 
 def tripleDifference(function,X1,X2,Y1,Y2,Z1,Z2):
     """
-    Evaluates a potential function set by weigthFunction() for a specific vertex set by
+    Evaluates a potential function set by weightFunction() for a specific vertex set by
     the vertexes coordinates (shifted endpoints), then applies the triple difference (eq.11) operator to it.
 
     Inputs:
-    function            ... object, the equation/potential function, set by weigth_fun()
+    function            ... object, the equation/potential function, set by weight_fun()
     X1,X2,Y1,Y2,Z1,Z2   ... int, shifted endpoints, the domain of the prism shifted by the coordinates of the evaluation point (eq.10)
 
     Outputs:
