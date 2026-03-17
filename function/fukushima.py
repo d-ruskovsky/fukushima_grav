@@ -31,7 +31,7 @@ def Fukushima(prism,point,density,mode=1,debug=False):
     point   ... list of 3 values,   the coordinates of the evaluation point x,y,z
     density ... list of n values,   the coefficients of the chosen density polynomial, rho_0,rho_1 ... rho_n
     mode    ... int,                1 (default) - compute gravitational potential only, 2 - gravitational potential + acceleration, 3 - potential + acceleration + tensor
-    debug   --- boolean,            default set to False, True for using logger package to print each step of the calculation
+    debug   ... boolean,            default set to False, True for using logger package to print each step of the calculation
 
     Outputs (based on mode set):
     V       ... int,    gravitational potential effect of the prism on the evaluation point
@@ -56,11 +56,9 @@ def Fukushima(prism,point,density,mode=1,debug=False):
 
     elif mode==2:
         logger.info("Starting calculation of gravitational potential V, acceleration g")
-        return
     
     elif mode==3:
         logger.info("Starting calculation of gravitational potential V, acceleration g, tensor G")
-        return
     
     # Shifting endpoints/vertices - (eq.10)
     # expectected prism domain in list - [x1,x2,y1,y2,z1,z2]
@@ -83,27 +81,70 @@ def Fukushima(prism,point,density,mode=1,debug=False):
     logger.info(f"Polynomial degree N set to {N}, polynomial coefficients: {density}")
     
     # Calculating gravitational effect of prism in evaluation point
-    V = 0 # inicialize value for recursive computation
+    V = 0 # inicialize values for recursive computation
+
+    if mode >= 2:
+        # Gravitational acceleration components gx, gy, gz
+        gx = 0
+        gy = 0
+        gz = 0
+
+    if mode >= 3:
+        # Gravitational force tensor components
+        Gxx = 0
+        Gxy = 0
+        Gxz = 0
+        Gyy = 0
+        Gyz = 0
+        Gzz = 0
+    
+    logger.info(f"Initial values set")
 
     for m in range(N + 1):
         logger.info(f"--Starting calculation, loop {m} of {N}")
 
         # Calculate the polynomial coefficient for current loop
-        c = cCoefficient(N, m, (prism[5]+Z2), density) # WINNER -------
+        c = cCoefficient(N, m, (prism[5]+Z2), density)
         logger.info(f"Returned from function cCoefficient(), cm = {c[0]}, c'n = {c[1]}, c''n = {c[2]}, loop {m} of {N}")
 
         # Calculate the weight function for the current loop
-        W = weightFunction(X1,X2,Y1,Y2,Z1,Z2,m)
+        W = weightFunction(X1,X2,Y1,Y2,Z1,Z2,m,mode)
         logger.info(f"Returned from function weightFunction(), W = {W}, loop {m} of {N}")
 
         # Gravitational potential - (eq.13)
-        V += c[0] * W
+        V += c[0] * W["W"]
         logger.info(f"V = {V}, loop {m} of {N}")
+
+        if mode >= 2:
+            # Gravitational acceleration components (eq.16)
+            gx += c[0] * W["Wx"]
+            gy += c[0] * W["Wy"]
+            gz += c[0] * W["Wx"] + c[1] * W["W"]
+            logger.info(f"gx = {gx}, gy = {gy}, gz = {gz}")
+        
+        if mode >=3:
+            # Gravitational force tensor components (eq.17)
+            Gxx += c[0] * W["Wxx"]
+            Gxy += c[0] * W["Wxy"]
+            Gyy += c[0] * W["Wyy"]
+            Gxz += c[0] * W["Wxz"] + c[1] * W["Wx"]
+            Gyz += c[0] * W["Wyz"] + c[1] * W["Wy"]
+            Gzz += c[0] * W["Wzz"] + 2 * c[1] * W["Wz"] + c[2] * W["W"]
+            logger.info(f"Gxx={Gxx}, Gxy={Gxy}, Gxz={Gxz}, Gyy={Gyy}, Gyz={Gyz}, Gzz={Gzz}, loop {m} of {N}")
+
     # END of loop
 
     # END of main function
-    return V
+    if mode == 1:
+        return V
+    elif mode == 2:
+        return V, [gx,gy,gz]
+    elif mode == 3:
+        return V, [gx,gy,gz], [Gxx,Gxy,Gxz,Gyy,Gyz,Gzz]
 
+# Note: all functions bellow were made specifically to assist the Fukushima() function in evaluating the gravitational 
+# effect of a right rectangular prism on an evaluation point. The functions therefore expect inputs to be already 
+# accepted by the Fukushima() function, and can be prone to errors if used by themselves. 
 
 def cCoefficient(N,m,z,density):
     """
@@ -162,7 +203,7 @@ def cCoefficient(N,m,z,density):
             cn_ += cnm_ * (z**j)
             logger.info(f"Calculation of c'n = {cn_}, for loop {j} out of (N - m - 1) = {N - m - 1}")
 
-    # END of loop
+        # END of loop
 
     if (N - m - 2) < 0:
         logger.info(f"2nd derivative of polynomial coefficient returning 0 as (N-n-2)={N-m-2}, must be at least 0")
@@ -179,12 +220,12 @@ def cCoefficient(N,m,z,density):
             cn__ += cnm__ * (z**j)
             logger.info(f"Calculation of c'n = {cn__}, for loop {j} out of (N - m - 2) = {N - m - 2}")
 
-    # END of loop
+        # END of loop
 
     return [cm,cn_,cn__]
 
 
-def weightFunction(X1,X2,Y1,Y2,Z1,Z2,n):
+def weightFunction(X1,X2,Y1,Y2,Z1,Z2,n,mode):
     """
     Works as a bridge between several functions, picking the correct potential function and 
     returning the function after the triple difference operator has been applied to it.
@@ -194,7 +235,9 @@ def weightFunction(X1,X2,Y1,Y2,Z1,Z2,n):
     n                   ... currently calculated loop
 
     Outputs:
-    W                   ... selected potential function evaluated with specified shifted endpoints using triple difference operator (eq.11)
+    result              ... dictionary of weight functions, potential function W is always calculated (mode 1), the result 
+                            also includes Wx,Wy,Wz (weight functions of acceleration vector g) for mode 2, and Wxx,Wxy,Wxz,Wyy,Wyz,Wzz 
+                            (weight functions of the force tensor G) for mode 3
     """
 
     if n == 0:
@@ -295,8 +338,28 @@ def weightFunction(X1,X2,Y1,Y2,Z1,Z2,n):
             e = elementaryFunction(X, Y, Z, n)
             return -(n + 1) * Z**n * e["C"] + n * Z**(n - 1) * (Y * e["D"][0] + X * e["E"][0])
         
+    # Weight function expressed and rewritten using triple difference (eq.9)
+    result = {"W": tripleDifference(U,X1,X2,Y1,Y2,Z1,Z2)}
+    logger.info(f"Weight function W for potential evaluated: {result['W']}")
 
-    return tripleDifference(U,X1,X2,Y1,Y2,Z1,Z2)
+    if mode >= 2:
+        # 1st derivatives of the weight function (acceleration vector g) (eq.20)
+        result["Wx"] = -tripleDifference(Ux,X1,X2,Y1,Y2,Z1,Z2)
+        result["Wy"] = -tripleDifference(Uy,X1,X2,Y1,Y2,Z1,Z2)
+        result["Wz"] = -tripleDifference(Uz,X1,X2,Y1,Y2,Z1,Z2)
+        logger.info(f"Weight functions Wx,Wy,Wz for acceleration vector evaluated: {result['Wx']},{result['Wy']},{result['Wz']}")
+
+    if mode >= 3:
+        # 2nd derivatives of the weight function (force tensor G) (eq.20)
+        result["Wxx"] = tripleDifference(Uxx,X1,X2,Y1,Y2,Z1,Z2)
+        result["Wxy"] = tripleDifference(Uxy,X1,X2,Y1,Y2,Z1,Z2)
+        result["Wxz"] = tripleDifference(Uxz,X1,X2,Y1,Y2,Z1,Z2)
+        result["Wyy"] = tripleDifference(Uyy,X1,X2,Y1,Y2,Z1,Z2)
+        result["Wyz"] = tripleDifference(Uyz,X1,X2,Y1,Y2,Z1,Z2)
+        result["Wzz"] = tripleDifference(Uzz,X1,X2,Y1,Y2,Z1,Z2)
+        logger.info(f"Weight functions Wxx,Wxy,Wxz,Wyy,Wyz,Wzz for force tensor evaluated: {result['Wxx']},{result['Wxy']},{result['Wxz']},{result['Wyy']},{result['Wyz']},{result['Wzz']}")
+
+    return result
 
 
 def elementaryFunction(X,Y,Z,n):
