@@ -2,18 +2,24 @@ import logging
 import numpy as np
 import math
 
+# Functions were made using these versions of above packages:
+# numpy     2.4.2   - external, pyenv used
+# logging   -       - Python standard library
+# math      -       - Python standard library
+
 # Create a logger for the whole library
 logger = logging.getLogger("Fukushima")
 
 def setup_logger(debug):
     """
-    This function creates a logger for the bellow functions - only to be used for debugging.
+    This function creates a logger for the below functions. Debugging is silenced unless set to True, in which case
+    logging.info() is printed when running the main function. 
     """
     # Logger usage - info for debug mode, else only use warning
     logger.setLevel(logging.INFO if debug else logging.WARNING)
     # Formater for logging messeages
     formatter = logging.Formatter('%(asctime)s | %(funcName)s | %(message)s', datefmt='%H:%M:%S')
-
+    # Prevent logger duplicity
     if not logger.handlers:
         console_handler = logging.StreamHandler()
         console_handler.setFormatter(formatter)
@@ -27,28 +33,45 @@ def Fukushima(prism,point,density,mode=1,debug=False):
     by Toshio Fukushima, DOI: 10.1093/gji/ggy317. 
 
     Inputs:
-    prism   ... list of 6 values,   the domain of the prism within the set coordinate system, x1,x2,y1,y2,z1,z2
-    point   ... list of 3 values,   the coordinates of the evaluation point x,y,z
+    prism   ... list of 6 values,   the domain of the prism within the set coordinate system, [x1,x2,y1,y2,z1,z2]
+    point   ... list of 3 values,   the coordinates of the evaluation point [x,y,z]
     density ... list of n values,   the coefficients of the chosen density polynomial, rho_0,rho_1 ... rho_n
     mode    ... int,                1 (default) - compute gravitational potential only, 2 - gravitational potential + acceleration, 3 - potential + acceleration + tensor
     debug   ... boolean,            default set to False, True for using logger package to print each step of the calculation
 
     Outputs (based on mode set):
-    V       ... int,    gravitational potential effect of the prism on the evaluation point
-    g       ... list,   gravitational acceleration vector, [g_x, g_y, g_z]
-    G       ... list,   gravitational tensor, [g_xx, g_xy, g_xz, g_yy, g_yz, g_zz]
+    V       ... float,              gravitational potential effect of the prism on the evaluation point
+    g       ... list of float,      gravitational acceleration vector, [gx, gy, gz]
+    G       ... list of float,      gravitational tensor, [Gxx, Gxy, Gxz, Gyy, Gyz, Gzz]
     """
 
-    # Check if prism value set correctly - to do
+    # Check if prism value set correctly
+    if len(prism) != 6:
+        raise ValueError(f"Prism must contain exactly 6 values [x1,x2,y1,y2,z1,z2], got {len(prism)}.")
+    if not all(isinstance(v,(int,float)) for v in prism):
+        raise ValueError(f"All prism values must be numeric")
+    if prism[0] >= prism[1] or prism[2] >= prism[3] or prism[4] >= prism[5]:
+        raise ValueError(f"Prism domain must satisfy x1<x2, y1<y2, z1<z2. Got x:[{prism[0]},{prism[1]}], y:[{prism[2]},{prism[3]}], z:[{prism[4]},{prism[5]}]")
 
-    # Check if point value set correctly - to do 
+    # Check if point value set correctly
+    if len(point) != 3:
+        raise ValueError(f"Point must contain exactly 3 values [x,y,z], got {len(prism)}.")
+    if not all(isinstance(v, (int,float)) for v in point):
+        raise ValueError(f"All point coordinates must be numeric")
     
     # Check if mode value set correctly
     if mode not in [1, 2, 3]:
         raise ValueError(f"Incorrect mode set: {mode}, allowed values: 1 (V), 2 (V+g), 3 (V+g+G). See documentation for further information.")
-    
+        
     # Set up logger for the main function
     setup_logger(debug)
+
+    # Check if evaluation point is located within the prism - will not cause a crash, but may degrade results (see section 2.6)
+    inside_x = prism[0] <= point[0] <= prism[1]
+    inside_y = prism[2] <= point[1] <= prism[3]
+    inside_z = prism[4] <= point[2] <= prism[5]
+    if inside_x and inside_y and inside_z:
+        logger.warning(f"Warning! Evaluation point within prism bounds.")
     
     # Calculated values according to set mode
     if mode==1:
@@ -142,25 +165,25 @@ def Fukushima(prism,point,density,mode=1,debug=False):
     elif mode == 3:
         return V, [gx,gy,gz], [Gxx,Gxy,Gxz,Gyy,Gyz,Gzz]
 
-# Note: all functions bellow were made specifically to assist the Fukushima() function in evaluating the gravitational 
+# Note: all functions below were made specifically to assist the Fukushima() function in evaluating the gravitational 
 # effect of a right rectangular prism on an evaluation point. The functions therefore expect inputs to be already 
 # accepted by the Fukushima() function, and can be prone to errors if used by themselves. 
 
 def cCoefficient(N,m,z,density):
     """
     Calculates the value of polynomial coefficients and their 1st and 2nd derivatives for the specific loop set by Fukushima().
-    Derivatives are only calculated if the polynomial is of a sufficiently high degree (1st derivative requires N<0, 2nd derivative 
-    requires N<1). Furthermore the indexing of the derivatives is slightly changed to maintain consistency within the function.
+    Derivatives are only calculated if the polynomial is of a sufficiently high degree (1st derivative requires (N-m-1)>=0, 2nd derivative 
+    requires (N-m-2)>=0). Furthermore the indexing of the derivatives is slightly changed to maintain consistency within the function.
     Indexes changed from article to function (article = function) -> m = j, n = m (only applies to derivatives). 
 
     Inputs:
     N       ... int, the degree of the density polynomial used
     m       ... int, currently calculated loop
-    z       ... int, the Z coordinate of the prism - more correctly the height of the prism
-    density ... list of n values, same as Fukushima()
+    z       ... float, the height coordinate of the evaluation point
+    density ... list of n values,   the coefficients of the chosen density polynomial, rho_0,rho_1 ... rho_n
 
     Outputs:
-    [cm,cn_,cn__]      ... list, m-th coefficient (cm), n-th 1st (cn_) and 2nd (cn__) derivatives of the density polynomial
+    [cm,cn_,cn__]      ... list, coefficient polynomial and its first and second derivatives with respect to z
     """
 
     cm = 0 # inicialize value of the coeficients for recursive computation
@@ -233,6 +256,7 @@ def weightFunction(X1,X2,Y1,Y2,Z1,Z2,n,mode):
     Inputs:
     X1,X2,Y1,Y2,Z1,Z2   ... shifted endpoints, the domain of the prism shifted by the coordinates of the evaluation point (eq.10)
     n                   ... currently calculated loop
+    mode                ... int, 1 (default) - compute gravitational potential only, 2 - gravitational potential + acceleration, 3 - potential + acceleration + tensor
 
     Outputs:
     result              ... dictionary of weight functions, potential function W is always calculated (mode 1), the result 
@@ -364,18 +388,18 @@ def weightFunction(X1,X2,Y1,Y2,Z1,Z2,n,mode):
 
 def elementaryFunction(X,Y,Z,n):
     """
-    Calculates the elementary functions of the specific coordinate combination for a set degree(loop). 
-    Elementary functions A,B,C,F are evaluated as integers, given they are not computed recursively. 
-    Elementary functions D,E,R are evaluated as lists, starting at [0] for n=0 (homogenous prism) 
+    Calculates the elementary functions of the specific coordinate combination for a set degree(loop) n. 
+    Elementary functions A,B,C,F are evaluated as floats, given they are not computed recursively. 
+    Elementary functions D,E,R are evaluated as lists of floats, starting at [0] for n=0 (homogenous prism) 
     and ending at [n+2] as required by potential functions. These can then be called easily, for example
     elementary["D"][2] will return the value of the elementary function D for n=2. 
 
     Inputs:
-    X,Y,Z       ... int, coordinates
-    n           ... currently calculated loop
+    X,Y,Z       ... float, coordinates
+    n           ... current polynomial degree index
 
     Outputs:
-    elementary  ... dict, comprised of ints (A,B,C,F) and lists (D,E,R) evaluated for the specific coordinates and degree/loop (n+2)
+    elementary  ... dict, comprised of floats (A,B,C,F) and lists (D,E,R) evaluated for the specific coordinates and degree/loop (n+2)
 
     """
     logger.info(f"Calculating elementary functions for X = {X}, Y = {Y}, Z = {Z}. Loop {n}")
@@ -434,11 +458,11 @@ def tripleDifference(function,X1,X2,Y1,Y2,Z1,Z2):
     the vertexes coordinates (shifted endpoints), then applies the triple difference (eq.11) operator to it.
 
     Inputs:
-    function            ... object, the equation/potential function, set by weight_fun()
-    X1,X2,Y1,Y2,Z1,Z2   ... int, shifted endpoints, the domain of the prism shifted by the coordinates of the evaluation point (eq.10)
+    function            ... object, the equation/potential function, set by weightFunction()
+    X1,X2,Y1,Y2,Z1,Z2   ... float, shifted endpoints, the domain of the prism shifted by the coordinates of the evaluation point (eq.10)
 
     Outputs:
-    triple difference   ... int, potential function evaluated for specific vertex, with the operator already applied
+    triple difference   ... float, potential function's alternating sum over all 8 vertices
     """
     
     logger.info(f"Triple difference applied for function {function},X1({X1}),X2({X2}),Y1({Y1}),Y2({Y2}),Z1({Z1}),Z2({Z2}")
@@ -446,17 +470,20 @@ def tripleDifference(function,X1,X2,Y1,Y2,Z1,Z2):
     return function(X2,Y2,Z2) - function(X2,Y2,Z1) - function(X2,Y1,Z2) + function(X2,Y1,Z1) \
             - function(X1,Y2,Z2) + function(X1,Y2,Z1) + function(X1,Y1,Z2) - function(X1,Y1,Z1)
 
+# Note: The author mentions in section 2.6, that evaluation near or inside verices or surface of the prism may lead to 
+# degradation of the results. The bellow functions will prevent a crash in calculation, however the resulting values 
+# might be damaged. 
 
 def atan3(X,Y,Z):
     """
-    Calculates the arcus tangents of specified X,Y,Z coordinates, while 
-    using the switch structure for returning a 0 if the xi coordinate is also 0 (eq.37)
+    Calculates the arctangent of specified X,Y,Z coordinates, while 
+    using the branch structure for returning a 0 if the xi coordinate is also 0 (eq.37)
 
     Inputs:
-    X,Y,Z   ... int, coordinates
+    X,Y,Z   ... float, coordinates
 
     Outputs:
-    atan3   ... int, the arcus tangents value
+    atan3   ... float, the arctangent value
     """
     # Possibly worth noting that the coordinates are written as xi, eta and zeta in the article.
     # Or maybe not worth noting, but note it I shall nonetheles. 
@@ -471,13 +498,13 @@ def atan3(X,Y,Z):
 def logsum(X,Y,Z):
     """
     Calculates the natural logarithm of specified X,Y,Z coordinates, while 
-    using the switch structure for changing the equation structure to prevent numerical errors. (eq.38)
+    using the branch structure that selects among equivalent forms to prevent numerical errors. (eq.38)
 
     Inputs:
-    X,Y,Z       ... int, coordinates
+    X,Y,Z       ... float, coordinates
 
     Outputs:
-    logsum      ... int, the natural logarithm value
+    logsum      ... float, the natural logarithm value
     """
     # Value 10**-150 in the article is defined as omega "tiny positive constant". Decided to use the value 
     # in the function directly instead of creating a separate variable to prevent needless re-defining 
