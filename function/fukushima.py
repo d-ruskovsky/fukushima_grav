@@ -127,7 +127,8 @@ def Fukushima(prism,point,density,mode=1,debug=False):
         logger.info(f"--Starting calculation, loop {m} of {N}")
 
         # Calculate the polynomial coefficient for current loop
-        c = cCoefficient(N, m, (prism[5]+Z2), density)
+        # c = cCoefficient(N, m, (prism[5]+Z2), density)
+        c = cCoefficient(N, m, point[2], density)
         logger.info(f"Returned from function cCoefficient(), cm = {c[0]}, c'n = {c[1]}, c''n = {c[2]}, loop {m} of {N}")
 
         # Calculate the weight function for the current loop
@@ -142,7 +143,7 @@ def Fukushima(prism,point,density,mode=1,debug=False):
             # Gravitational acceleration components (eq.16)
             gx += c[0] * W["Wx"]
             gy += c[0] * W["Wy"]
-            gz += c[0] * W["Wx"] + c[1] * W["W"]
+            gz += c[0] * W["Wz"] + c[1] * W["W"]
             logger.info(f"gx = {gx}, gy = {gy}, gz = {gz}")
         
         if mode >=3:
