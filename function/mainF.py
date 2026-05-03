@@ -6,6 +6,23 @@ from fukushima import Fukushima
 from goossens import Goossens2Fukushima
 
 def mainF(files, area, radius, mode, ref_sph=1727, density_mode="3d"):
+    """
+    Main function for computing gravitational effects using the Fukushima function along
+    the goossens2fukushima to transform the density polynomial. WildPfeiffer formulas are used
+    to transform input spherical coords into metric coords (tesseroids to right rectangular prisms)
+
+    Inputs:
+    files: list of DEM and density model
+    area: chosen area to be evaluated
+    radius: radius of the evaluation region
+    mode: mode of operation (1: potential, 2: potential + acceleration, 3: potential + acceleration + tensor)
+    ref_sph: reference sphere radius
+    density_mode: mode for density evaluation ("constant", "2d", or "3d")
+
+    Outputs:
+    results: dictionary of calculated gravitational components
+    stats: statistics from the evaluated region
+    """
 
     # Reading input files
     DEM = xr.load_dataarray(files[0], engine='gmt', raster_kind='grid')
@@ -31,9 +48,9 @@ def mainF(files, area, radius, mode, ref_sph=1727, density_mode="3d"):
     DEM_eval_m = (DEM_eval + height_offset) * 1000
 
     # Create Mercator projection of input files
-    simfig(DEM_area, cmap="viridis")
+    simfig(DEM_area + height_offset, cmap="viridis")
     simfig(RHO_area, cmap="plasma")
-    simfig(GRAD_area, cmap="matlab/polar", center_zero=True, ref_grid=files[2])
+    simfig(GRAD_area, cmap="matlab/polar",ref_file=GRAD)
 
     # Recalculate spherical coordinates into local cartesian coordinates
     dx, dy, dz = tess2prism(DEM_eval_m, (ref_sph * 1000))
@@ -165,8 +182,26 @@ def mainF(files, area, radius, mode, ref_sph=1727, density_mode="3d"):
                 gyz[ia, ja] = Gyz_sum
                 gzz[ia, ja] = Gzz_sum
 
+    # Saving results in a dictionary for further use
+    results = {}
+    if mode >= 1:
+        results["V"] = V
+    if mode >= 2:
+        results["gx"] = gx
+        results["gy"] = gy
+        results["gz"] = gz
+    if mode >= 3:
+        results["gxx"] = gxx
+        results["gxy"] = gxy
+        results["gxz"] = gxz
+        results["gyy"] = gyy
+        results["gyz"] = gyz
+        results["gzz"] = gzz
+
+    # Saving statistics in a list for further use
     stats = []
 
+    # Also generate simple figures from the results
     if mode >= 1:
         stats.append(collect_stats("V [m^2/s^2]", V))
         simfig(V, cmap="plasma")
@@ -196,19 +231,54 @@ def mainF(files, area, radius, mode, ref_sph=1727, density_mode="3d"):
     stats_df = pd.DataFrame(stats)
     print(stats_df.to_string(index=False))
 
-    return
+    return results, stats
 
 
-def simfig(map, cmap="viridis", center_zero=False, ref_grid=None):
-    fig = pygmt.Figure()
-    with pygmt.config(MAP_FRAME_TYPE="fancy"):
-        fig.grdimage(grid=map, projection="M15c", cmap=cmap)
-        fig.basemap(frame=["a", "WSne"])
-        fig.colorbar()
-    fig.show()
+def simfig(map, cmap="viridis",ref_file=None, robust_pct=99):
+    """
+    Create a simple figure from a grid.
+
+    Inputs:
+    map: the grid to plot
+    cmap: the colormap to use
+    center_zero: whether to center the colormap at zero
+    ref_grid: the reference grid for interpolation
+    """
+
+    if ref_file is None:
+        fig = pygmt.Figure()
+        with pygmt.config(MAP_FRAME_TYPE="fancy"):
+            fig.grdimage(grid=map, projection="M15c", cmap=cmap)
+            fig.basemap(frame=["a", "WSne"])
+            fig.colorbar()
+        fig.show()
+    else:
+        # Shorten colorbar using actual map values (robust symmetric range)
+        vals = map.values
+        vals = vals[np.isfinite(vals)]
+        vmax = float(np.nanpercentile(np.abs(vals), robust_pct))
+        if not np.isfinite(vmax) or vmax <= 0:
+            vmax = 1.0
+
+        fig = pygmt.Figure()
+        pygmt.makecpt(cmap=cmap, series=[-vmax, vmax])
+        with pygmt.config(MAP_FRAME_TYPE="fancy", FORMAT_FLOAT_MAP="%.0f"):
+            fig.grdimage(grid=map, projection="M15c", cmap=True)
+            fig.basemap(frame=["a", "WSne"])
+            fig.colorbar()
+        fig.show()
 
 
 def tess2prism(DEM, ref_sph_m):
+    """
+    Convert a spherical coordinate grid to a prism grid.
+    Inputs:
+    DEM: the digital elevation model
+    ref_sph_m: the reference sphere radius
+
+    Outputs:
+    dx, dy, dz: metric dimensions of the prisms
+    """
     lon = DEM.lon.values
     lat = DEM.lat.values
 
@@ -242,6 +312,19 @@ def tess2prism(DEM, ref_sph_m):
 
 
 def cutout(DEM, RHO, GRAD, area, radius):
+    """
+    Extract a subset of the DEM within a specified area and radius.
+
+    Inputs:
+    DEM: the digital elevation model
+    RHO: the density grid
+    GRAD: the gravity gradient grid
+    area: the bounding box coordinates (lon_min, lon_max, lat_min, lat_max)
+    radius: the radius of the area to extract
+
+    Outputs:
+    DEM_area, DEM_eval, RHO_area, RHO_eval, GRAD_area, GRAD_eval
+    """
     lon_min, lon_max, lat_min, lat_max = area
 
     dlon = float(DEM.lon[1] - DEM.lon[0])
@@ -264,6 +347,16 @@ def cutout(DEM, RHO, GRAD, area, radius):
 
 
 def WildPfeiffer(r1, r2, lambda1, lambda2, phi1, phi2):
+    """
+    Calculate the metric dimensions of a prism based on its vertices.
+    Inputs:
+    r1, r2: radii of the two vertices
+    lambda1, lambda2: longitudes of the two vertices
+    phi1, phi2: latitudes of the two vertices
+
+    Outputs:
+    dx, dy, dz: metric dimensions of the prism
+    """
     r0 = (r1 + r2) / 2
     phi0 = np.deg2rad((phi1 + phi2) / 2)
     dlambda = np.deg2rad(lambda2 - lambda1)
@@ -277,6 +370,14 @@ def WildPfeiffer(r1, r2, lambda1, lambda2, phi1, phi2):
 
 
 def cellcentre(dx, dy):
+    """
+    Calculate the center coordinates of each cell in a grid.
+    Inputs:
+    dx,dy: metric dimensions of prisms
+
+    Outputs:
+    centers of the evaluation points
+    """
     x_center = np.zeros_like(dx)
     y_center = np.zeros_like(dy)
 
@@ -298,6 +399,16 @@ def cellcentre(dx, dy):
 
 
 def collect_stats(label, grid):
+    """
+    Collect statistics from a grid.
+    
+    Inputs:
+    label: name of the grid
+    grid: grid variable
+
+    Outputs:
+    dictionary of stats of the grid
+    """
     vals = grid.values
     vals = vals[np.isfinite(vals)]
 
