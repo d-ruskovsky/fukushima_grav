@@ -42,6 +42,7 @@ def mainF(files, area, radius, mode, ref_sph=1727, density_mode="3d"):
     dx_cell = ref_sph_m * np.cos(np.deg2rad(phi0)) * np.deg2rad(dlon)
     cell_m = min(abs(dx_cell), abs(dy_cell))
     radius_cells = int(np.ceil(radius_m / cell_m))
+    print(f"Radius in cells (approx): {radius_cells} cells for {radius_m/1000:.2f} km")
 
     # Cut out a region from DEM,RHO,GRAD of the chosen area + radius
     DEM_area, DEM_eval, RHO_area, RHO_eval, GRAD_area, GRAD_eval = cutout(DEM, RHO, GRAD, area, radius_cells)
