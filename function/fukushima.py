@@ -67,11 +67,11 @@ def Fukushima(prism,point,density,mode=1,debug=False):
     setup_logger(debug)
 
     # Check if evaluation point is located within the prism - will not cause a crash, but may degrade results (see section 2.6)
-    inside_x = prism[0] <= point[0] <= prism[1]
-    inside_y = prism[2] <= point[1] <= prism[3]
-    inside_z = prism[4] <= point[2] <= prism[5]
-    if inside_x and inside_y and inside_z:
-        logger.warning(f"Warning! Evaluation point within prism bounds.")
+    # inside_x = prism[0] <= point[0] <= prism[1]
+    # inside_y = prism[2] <= point[1] <= prism[3]
+    # inside_z = prism[4] <= point[2] <= prism[5]
+    # if inside_x and inside_y and inside_z:
+    #     logger.warning(f"Warning! Evaluation point within prism bounds.")
     
     # Calculated values according to set mode
     if mode==1:
