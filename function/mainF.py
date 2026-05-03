@@ -23,7 +23,6 @@ def mainF(files, area, radius, mode, ref_sph=1727, density_mode="3d"):
     results: dictionary of calculated gravitational components
     stats: statistics from the evaluated region
     """
-
     # Reading input files
     DEM = xr.load_dataarray(files[0], engine='gmt', raster_kind='grid')
     RHO = xr.load_dataarray(files[1], engine='gmt', raster_kind='grid')
@@ -34,8 +33,18 @@ def mainF(files, area, radius, mode, ref_sph=1727, density_mode="3d"):
     dlat = float(DEM.lat[1] - DEM.lat[0])
     area = [area[0], area[1] + dlon, area[2], area[3] + dlat]
 
+    # Convert radius from km to meters, and to an approximate cell radius for cutout
+    radius_m = float(radius) * 1000.0
+    ref_sph_m = float(ref_sph) * 1000.0
+    phi0 = 0.5 * (area[2] + area[3])
+
+    dy_cell = ref_sph_m * np.deg2rad(dlat)
+    dx_cell = ref_sph_m * np.cos(np.deg2rad(phi0)) * np.deg2rad(dlon)
+    cell_m = min(abs(dx_cell), abs(dy_cell))
+    radius_cells = int(np.ceil(radius_m / cell_m))
+
     # Cut out a region from DEM,RHO,GRAD of the chosen area + radius
-    DEM_area, DEM_eval, RHO_area, RHO_eval, GRAD_area, GRAD_eval = cutout(DEM, RHO, GRAD, area, radius)
+    DEM_area, DEM_eval, RHO_area, RHO_eval, GRAD_area, GRAD_eval = cutout(DEM, RHO, GRAD, area, radius_cells)
 
     if density_mode not in ["constant", "2d", "3d"]:
         raise ValueError("density_mode must be 'constant', '2d', or '3d'")
@@ -89,8 +98,9 @@ def mainF(files, area, radius, mode, ref_sph=1727, density_mode="3d"):
     lon_offset = np.where(np.isclose(lon_eval, lon_area[0]))[0][0]
 
     total_eval = (len(lat_area) - 1) * (len(lon_area) - 1)
-    total_prisms = (2 * radius + 1) ** 2
-    print(f"Prisms per evaluation point: {total_prisms}")
+    max_prisms = (2 * radius_cells + 1) ** 2
+    print(f"Max prisms per evaluation point (square window): {max_prisms}")
+    print(f"Circular radius used: {radius_m/1000:.2f} km")
 
     # Loop over all cells in DEM_area (gridline registration: n-1 cells)
     for ia in range(len(lat_area) - 1):
@@ -112,14 +122,20 @@ def mainF(files, area, radius, mode, ref_sph=1727, density_mode="3d"):
             gx_sum = gy_sum = gz_sum = 0.0
             Gxx_sum = Gxy_sum = Gxz_sum = Gyy_sum = Gyz_sum = Gzz_sum = 0.0
 
-            for i in range(ie - radius, ie + radius + 1):
-                for j in range(je - radius, je + radius + 1):
+            for i in range(ie - radius_cells, ie + radius_cells + 1):
+                for j in range(je - radius_cells, je + radius_cells + 1):
 
                     if i < 0 or j < 0 or i >= len(lat_eval) - 1 or j >= len(lon_eval) - 1:
                         continue
 
                     cx = x_center[i, j]
                     cy = y_center[i, j]
+
+                    # Circular radius check (in meters)
+                    dxp = cx - eval_point[0]
+                    dyp = cy - eval_point[1]
+                    if (dxp * dxp + dyp * dyp) > (radius_m * radius_m):
+                        continue
 
                     z_top = float(DEM_eval_m.isel(lat=i, lon=j))
                     z_bot = z_top - dz[i, j]
