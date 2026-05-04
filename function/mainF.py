@@ -148,16 +148,13 @@ def mainF(files, area, radius, mode, ref_sph=1727, density_mode="3d"):
                     ]
 
                     if density_mode == "constant":
-                        rho0 = rho_mean
-                        rho1 = 0.0
+                        density = [rho_mean]
                     elif density_mode == "2d":
-                        rho0 = float(RHO_eval.isel(lat=i, lon=j))
-                        rho1 = 0.0
+                        density = [float(RHO_eval.isel(lat=i, lon=j))]
                     else:
                         rho0 = float(RHO_eval.isel(lat=i, lon=j))
-                        rho1 = float(GRAD_eval.isel(lat=i, lon=j))
-
-                    density = Goossens2Fukushima(prism, [rho0, rho1])
+                        rho1 = float(GRAD_eval.isel(lat=i, lon=j))/ 1000.0  # convert it to kg/m^3/m
+                        density = Goossens2Fukushima(prism, [rho0, rho1])
 
                     if mode == 1:
                         V_val = Fukushima(prism, eval_point, density, mode=1)
@@ -355,9 +352,9 @@ def cutout(DEM, RHO, GRAD, area, radius):
     DEM_eval = DEM.sel(lon=slice(ext_lon_min, ext_lon_max), lat=slice(ext_lat_min, ext_lat_max))
     DEM_area = DEM.sel(lon=slice(lon_min, lon_max), lat=slice(lat_min, lat_max))
 
-    RHO_eval = RHO.interp_like(DEM_eval, method='nearest')
+    RHO_eval = RHO.interp_like(DEM_eval, method='linear')
     RHO_area = RHO.interp_like(DEM_area, method='nearest')
-    GRAD_eval = GRAD.interp_like(DEM_eval, method='nearest')
+    GRAD_eval = GRAD.interp_like(DEM_eval, method='linear')
     GRAD_area = GRAD.interp_like(DEM_area, method='nearest')
 
     return DEM_area, DEM_eval, RHO_area, RHO_eval, GRAD_area, GRAD_eval
